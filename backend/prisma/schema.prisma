@@ -1,0 +1,105 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // LOKAAL: sqlite. PRODUCTIE (Supabase): wijzig provider naar "postgresql".
+  // Zie DEPLOY.md voor de exacte stappen.
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  email       String?  @unique
+  username    String   @unique
+  name        String
+  avatar      String   @default("⚽")
+  isAdmin     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  predictions      Prediction[]
+  bonusPredictions BonusPrediction[]
+  memberships      PoolMember[]
+}
+
+model Pool {
+  id         String       @id @default(cuid())
+  name       String
+  inviteCode String       @unique
+  adminId    String
+  settings   String       @default("{}")
+  createdAt  DateTime     @default(now())
+
+  members     PoolMember[]
+  predictions Prediction[]
+  bonusPredictions BonusPrediction[]
+}
+
+model PoolMember {
+  id     String @id @default(cuid())
+  userId String
+  poolId String
+  role   String @default("member")
+
+  user User @relation(fields: [userId], references: [id])
+  pool Pool @relation(fields: [poolId], references: [id])
+
+  @@unique([userId, poolId])
+}
+
+model Match {
+  id        String   @id @default(cuid())
+  matchNum  Int      @unique
+  homeTeam  String
+  awayTeam  String
+  matchDate DateTime
+  stadium   String
+  city      String
+  round     String
+  group     String?
+  homeScore Int?
+  awayScore Int?
+
+  predictions Prediction[]
+}
+
+model Prediction {
+  id           String  @id @default(cuid())
+  userId       String
+  matchId      String
+  poolId       String
+  homeScore    Int
+  awayScore    Int
+  toto         String  @default("") // "1" = thuis wint, "2" = uit wint, "X" = gelijkspel
+  jokerUsed    Boolean @default(false)
+  pointsEarned Int?
+
+  user  User  @relation(fields: [userId], references: [id])
+  match Match @relation(fields: [matchId], references: [id])
+  pool  Pool  @relation(fields: [poolId], references: [id])
+
+  @@unique([userId, matchId, poolId])
+}
+
+model BonusPrediction {
+  id       String   @id @default(cuid())
+  userId   String
+  poolId   String
+  question String
+  answer   String
+  correct  Boolean?
+  points   Int?
+
+  user User @relation(fields: [userId], references: [id])
+  pool Pool @relation(fields: [poolId], references: [id])
+
+  @@unique([userId, poolId, question])
+}
+
+// De officiële antwoorden op de bonusvragen (door admin ingevuld).
+model BonusAnswer {
+  id       String @id @default(cuid())
+  question String @unique
+  answer   String
+}

@@ -1,0 +1,14 @@
+# Netlify-configuratie voor de WK Poule 2026 frontend.
+# Stel in de Netlify UI de environment variable VITE_API_URL in
+# naar de URL van je backend (bijv. https://wk-poule-backend.onrender.com).
+
+[build]
+  base = "frontend"
+  command = "npm run build"
+  publish = "frontend/dist"
+
+# Single Page App: stuur alle routes naar index.html.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

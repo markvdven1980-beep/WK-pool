@@ -1,0 +1,22 @@
+node_modules/
+dist/
+*.log
+
+# Secrets en lokale env
+.env
+.env.*
+!.env.example
+
+# Lokale database
+*.db
+*.db-journal
+
+# Gegenereerde productie-schema
+backend/prisma/schema.production.prisma
+
+# Lokale tooling-config (bevat absolute paden)
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db

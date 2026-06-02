@@ -1,0 +1,26 @@
+# Render Blueprint voor de WK Poule 2026 backend.
+# Maak een nieuw Blueprint aan op https://render.com en wijs naar deze repo.
+# Vul daarna de environment variables in (DATABASE_URL, CORS_ORIGIN, evt. FOOTBALL_DATA_API_KEY).
+
+services:
+  - type: web
+    name: wk-poule-backend
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm install && npm run build:prod && npm run db:push:prod
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      # Supabase-connectiestring (Settings → Database → Connection string → URI).
+      - key: DATABASE_URL
+        sync: false
+      # De Netlify-URL van je frontend, bijv. https://wk-poule-2026.netlify.app
+      - key: CORS_ORIGIN
+        sync: false
+      # Wordt automatisch veilig gegenereerd.
+      - key: JWT_SECRET
+        generateValue: true
+      # Optioneel: API-key van football-data.org voor automatische uitslagen.
+      - key: FOOTBALL_DATA_API_KEY
+        sync: false

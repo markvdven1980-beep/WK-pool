@@ -1,0 +1,220 @@
+import { useState, useEffect } from 'react';
+import { api } from '../api';
+import type { Match, SyncResult, BonusQuestion } from '../api';
+import { getFlag } from '../teams';
+import BonusInput from '../components/BonusInput';
+
+export default function AdminPage() {
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [filter, setFilter] = useState<'upcoming' | 'all'>('upcoming');
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<SyncResult | null>(null);
+
+  const loadMatches = () => api.matches.list().then(setMatches);
+
+  useEffect(() => {
+    loadMatches().finally(() => setLoading(false));
+  }, []);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    setSyncMsg(null);
+    try {
+      const result = await api.admin.sync();
+      setSyncMsg(result);
+      if (result.updated > 0) await loadMatches();
+    } catch (err: any) {
+      setSyncMsg({ ok: false, checked: 0, updated: 0, message: err.message, updatedMatches: [] });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const filtered = matches.filter((m) => {
+    if (filter === 'upcoming') return m.homeScore === null;
+    return true;
+  });
+
+  const handleResult = async (match: Match, homeScore: string, awayScore: string) => {
+    const h = parseInt(homeScore);
+    const a = parseInt(awayScore);
+    if (isNaN(h) || isNaN(a)) return;
+    const result = await api.admin.setResult(match.id, h, a);
+    setMatches((prev) =>
+      prev.map((m) => (m.id === match.id ? { ...m, homeScore: h, awayScore: a } : m))
+    );
+    alert(`Uitslag opgeslagen! ${result.predictionsUpdated} voorspellingen bijgewerkt.`);
+  };
+
+  if (loading) {
+    return <div className="text-center py-12 text-gray-400">Laden...</div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold">Beheerder</h2>
+
+      <div className="bg-wk-card rounded-xl p-4 border border-gray-700 space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h3 className="font-semibold">Automatische uitslagen-sync</h3>
+            <p className="text-xs text-gray-400">
+              Uitslagen worden automatisch elke 5 minuten opgehaald via football-data.org en de punten direct herberekend.
+            </p>
+          </div>
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className="bg-wk-green hover:bg-wk-green-light text-white text-sm px-4 py-2 rounded-lg transition-colors disabled:opacity-50 shrink-0"
+          >
+            {syncing ? 'Synchroniseren...' : '🔄 Sync nu'}
+          </button>
+        </div>
+        {syncMsg && (
+          <div className={`text-sm rounded-lg p-3 ${syncMsg.ok ? 'bg-wk-darker text-gray-300' : 'bg-red-900/30 text-red-300'}`}>
+            <p>{syncMsg.message}{syncMsg.ok && ` (${syncMsg.checked} wedstrijden gecontroleerd)`}</p>
+            {syncMsg.updatedMatches.length > 0 && (
+              <ul className="mt-1 text-xs text-gray-400">
+                {syncMsg.updatedMatches.map((m) => (
+                  <li key={m.matchNum}>#{m.matchNum} {m.homeTeam} {m.score} {m.awayTeam}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
+
+      <AdminBonusPanel />
+
+      <div className="flex gap-2">
+        <button
+          onClick={() => setFilter('upcoming')}
+          className={`text-sm px-3 py-1.5 rounded-lg ${filter === 'upcoming' ? 'bg-wk-orange text-white' : 'bg-wk-card text-gray-300'}`}
+        >
+          Nog in te vullen
+        </button>
+        <button
+          onClick={() => setFilter('all')}
+          className={`text-sm px-3 py-1.5 rounded-lg ${filter === 'all' ? 'bg-wk-orange text-white' : 'bg-wk-card text-gray-300'}`}
+        >
+          Alle wedstrijden
+        </button>
+      </div>
+
+      <div className="space-y-3">
+        {filtered.map((match) => (
+          <AdminMatchRow key={match.id} match={match} onSubmit={handleResult} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AdminBonusPanel() {
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [questions, setQuestions] = useState<BonusQuestion[]>([]);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    api.pools.list().then((pools) => {
+      if (pools.length > 0) {
+        api.bonus.get(pools[0].id).then((d) => {
+          setQuestions(d.questions);
+          const map: Record<string, string> = {};
+          d.officialAnswers.forEach((a) => { map[a.question] = a.answer; });
+          setAnswers(map);
+        });
+      }
+    });
+  }, []);
+
+  const handleSave = async (question: string) => {
+    if (!answers[question]?.trim()) return;
+    const result = await api.admin.setBonusAnswer(question, answers[question].trim());
+    setMsg(`Antwoord opgeslagen — ${result.predictionsUpdated} voorspelling(en) beoordeeld.`);
+    setTimeout(() => setMsg(''), 3000);
+  };
+
+  if (questions.length === 0) return null;
+
+  return (
+    <div className="bg-wk-card rounded-xl p-4 border border-gray-700 space-y-3">
+      <div>
+        <h3 className="font-semibold">Bonusvragen beoordelen</h3>
+        <p className="text-xs text-gray-400">Vul het officiële antwoord in; de punten worden automatisch toegekend.</p>
+      </div>
+      {questions.map((q) => (
+        <div key={q.key} className="flex items-center gap-2">
+          <span className="text-sm flex-1 min-w-0">{q.label} <span className="text-wk-gold text-xs">({q.points}p)</span></span>
+          <div className="flex-1 min-w-0">
+            <BonusInput
+              question={q}
+              value={answers[q.key] ?? ''}
+              onChange={(v) => setAnswers((a) => ({ ...a, [q.key]: v }))}
+            />
+          </div>
+          <button
+            onClick={() => handleSave(q.key)}
+            className="bg-wk-green hover:bg-wk-green-light text-white text-sm px-3 py-1.5 rounded shrink-0"
+          >
+            Opslaan
+          </button>
+        </div>
+      ))}
+      {msg && <p className="text-green-400 text-sm">{msg}</p>}
+    </div>
+  );
+}
+
+function AdminMatchRow({
+  match,
+  onSubmit,
+}: {
+  match: Match;
+  onSubmit: (match: Match, homeScore: string, awayScore: string) => void;
+}) {
+  const [homeScore, setHomeScore] = useState(match.homeScore?.toString() ?? '');
+  const [awayScore, setAwayScore] = useState(match.awayScore?.toString() ?? '');
+
+  const date = new Date(match.matchDate).toLocaleDateString('nl-NL', {
+    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+  });
+
+  return (
+    <div className="bg-wk-card rounded-xl p-4 border border-gray-700 flex flex-col sm:flex-row items-center gap-3">
+      <div className="text-xs text-gray-400 w-24 shrink-0">
+        #{match.matchNum} · {date}
+      </div>
+      <div className="flex-1 flex items-center justify-center gap-2">
+        <span className="text-sm text-right flex-1">
+          {getFlag(match.homeTeam)} {match.homeTeam}
+        </span>
+        <input
+          type="number"
+          min="0"
+          value={homeScore}
+          onChange={(e) => setHomeScore(e.target.value)}
+          className="w-12 h-9 bg-wk-darker border border-gray-600 rounded text-center text-white text-sm focus:outline-none focus:border-wk-orange"
+        />
+        <span className="text-gray-500">-</span>
+        <input
+          type="number"
+          min="0"
+          value={awayScore}
+          onChange={(e) => setAwayScore(e.target.value)}
+          className="w-12 h-9 bg-wk-darker border border-gray-600 rounded text-center text-white text-sm focus:outline-none focus:border-wk-orange"
+        />
+        <span className="text-sm flex-1">
+          {match.awayTeam} {getFlag(match.awayTeam)}
+        </span>
+      </div>
+      <button
+        onClick={() => onSubmit(match, homeScore, awayScore)}
+        className="bg-wk-green hover:bg-wk-green-light text-white text-sm px-4 py-2 rounded-lg shrink-0"
+      >
+        Opslaan
+      </button>
+    </div>
+  );
+}
