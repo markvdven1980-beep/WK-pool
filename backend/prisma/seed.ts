@@ -144,14 +144,14 @@ const matches = [
 ];
 
 async function main() {
-  console.log('Seeding database...');
+  // Idempotent: als de database al gevuld is, niets doen (voorkomt dataverlies bij elke deploy).
+  const existing = await prisma.match.count();
+  if (existing > 0) {
+    console.log(`Database bevat al ${existing} wedstrijden — seed overgeslagen.`);
+    return;
+  }
 
-  await prisma.prediction.deleteMany();
-  await prisma.bonusPrediction.deleteMany();
-  await prisma.poolMember.deleteMany();
-  await prisma.pool.deleteMany();
-  await prisma.match.deleteMany();
-  await prisma.user.deleteMany();
+  console.log('Seeding database...');
 
   for (const match of matches) {
     await prisma.match.create({
