@@ -15,18 +15,23 @@ const PORT = process.env.PORT || 3001;
 const prisma = new PrismaClient();
 
 // Toegestane origins komma-gescheiden via CORS_ORIGIN (bijv. https://wk-poule.netlify.app).
-// Lokaal valt het terug op de Vite-dev-server.
+// Lokaal valt het terug op de Vite-dev-server. Slashes op het eind worden genegeerd.
+const stripSlash = (s: string) => s.trim().replace(/\/+$/, '');
 const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
   .split(',')
-  .map((o) => o.trim());
+  .map(stripSlash)
+  .filter(Boolean);
+
+console.log('Toegestane CORS-origins:', allowedOrigins.join(', '));
 
 app.use(cors({
   origin: (origin, callback) => {
     // Sta verzoeken zonder origin toe (bijv. curl, health checks).
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.includes(stripSlash(origin))) {
       callback(null, true);
     } else {
-      callback(new Error(`Origin niet toegestaan: ${origin}`));
+      // Niet toegestaan: weiger netjes zonder 500-fout te veroorzaken.
+      callback(null, false);
     }
   },
   credentials: true,
