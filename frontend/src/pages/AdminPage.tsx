@@ -127,6 +127,13 @@ function AdminUsersPanel() {
     setResetResult(result);
   };
 
+  const handleDelete = async (user: AdminUser) => {
+    if (!confirm(`Gebruiker "${user.name}" (@${user.username}) verwijderen? Dit kan niet ongedaan worden gemaakt.`)) return;
+    await api.admin.deleteUser(user.id);
+    setUsers((prev) => prev.filter((u) => u.id !== user.id));
+    setResetResult(null);
+  };
+
   return (
     <div className="bg-wk-card rounded-xl p-4 border border-gray-700 space-y-3">
       <div>
@@ -155,12 +162,20 @@ function AdminUsersPanel() {
               {user.isAdmin && <span className="text-xs bg-wk-gold/20 text-wk-gold px-1.5 rounded">Admin</span>}
             </div>
             {!user.isAdmin && (
-              <button
-                onClick={() => handleReset(user)}
-                className="text-xs text-gray-400 hover:text-wk-orange border border-gray-600 hover:border-wk-orange px-2 py-1 rounded transition-colors"
-              >
-                Reset wachtwoord
-              </button>
+              <div className="flex gap-1.5">
+                <button
+                  onClick={() => handleReset(user)}
+                  className="text-xs text-gray-400 hover:text-wk-orange border border-gray-600 hover:border-wk-orange px-2 py-1 rounded transition-colors"
+                >
+                  Reset wachtwoord
+                </button>
+                <button
+                  onClick={() => handleDelete(user)}
+                  className="text-xs text-gray-400 hover:text-red-400 border border-gray-600 hover:border-red-400 px-2 py-1 rounded transition-colors"
+                >
+                  Verwijderen
+                </button>
+              </div>
             )}
           </div>
         ))}

@@ -76,6 +76,8 @@ export const api = {
     getUsers: () => request<AdminUser[]>('/admin/users'),
     resetPassword: (userId: string) =>
       request<{ username: string; newPassword: string }>(`/admin/users/${userId}/reset-password`, { method: 'POST' }),
+    deleteUser: (userId: string) =>
+      request<{ deleted: string }>(`/admin/users/${userId}`, { method: 'DELETE' }),
   },
   bonus: {
     get: (poolId: string) => request<BonusData>(`/bonus?poolId=${poolId}`),

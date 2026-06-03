@@ -68,6 +68,29 @@ adminRouter.get('/users', async (req: AuthRequest, res: Response) => {
   res.json(users);
 });
 
+// Gebruiker verwijderen inclusief al zijn data.
+adminRouter.delete('/users/:id', async (req: AuthRequest, res: Response) => {
+  if (!(await requireAdmin(req, res))) return;
+  const user = await prisma.user.findUnique({ where: { id: req.params.id } });
+  if (!user) { res.status(404).json({ error: 'Gebruiker niet gevonden' }); return; }
+  if (user.isAdmin) { res.status(403).json({ error: 'Kan admin-account niet verwijderen' }); return; }
+
+  // Verwijder alle data van deze gebruiker.
+  await prisma.bonusPrediction.deleteMany({ where: { userId: user.id } });
+  await prisma.prediction.deleteMany({ where: { userId: user.id } });
+  await prisma.poolMember.deleteMany({ where: { userId: user.id } });
+  // Verwijder ook poules waarvan deze gebruiker admin is.
+  const ownedPools = await prisma.pool.findMany({ where: { adminId: user.id } });
+  for (const pool of ownedPools) {
+    await prisma.bonusPrediction.deleteMany({ where: { poolId: pool.id } });
+    await prisma.prediction.deleteMany({ where: { poolId: pool.id } });
+    await prisma.poolMember.deleteMany({ where: { poolId: pool.id } });
+    await prisma.pool.delete({ where: { id: pool.id } });
+  }
+  await prisma.user.delete({ where: { id: user.id } });
+  res.json({ deleted: user.username });
+});
+
 // Wachtwoord resetten — genereert nieuw WK-wachtwoord, toont het eenmalig.
 adminRouter.post('/users/:id/reset-password', async (req: AuthRequest, res: Response) => {
   if (!(await requireAdmin(req, res))) return;
