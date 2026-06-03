@@ -170,21 +170,25 @@ async function main() {
 
   console.log(`Seeded ${matches.length} matches`);
 
-  const adminPassword = generatePassword('admin');
-  const adminHash = await hashPassword(adminPassword);
-  const admin = await prisma.user.create({
-    data: {
-      username: 'admin',
-      name: 'Beheerder',
-      email: 'admin@wkpoule.nl',
-      avatar: '👑',
-      isAdmin: true,
-      passwordHash: adminHash,
-    },
-  });
-
-  console.log(`Created admin user: ${admin.username}`);
-  console.log(`Admin password (eenmalig): ${adminPassword}`);
+  // Admin upsert — aanmaken als die nog niet bestaat, anders overslaan.
+  const existingAdmin = await prisma.user.findUnique({ where: { username: 'admin' } });
+  if (!existingAdmin) {
+    const adminPassword = generatePassword('admin');
+    const adminHash = await hashPassword(adminPassword);
+    await prisma.user.create({
+      data: {
+        username: 'admin',
+        name: 'Beheerder',
+        email: 'admin@wkpoule.nl',
+        avatar: '👑',
+        isAdmin: true,
+        passwordHash: adminHash,
+      },
+    });
+    console.log(`Admin wachtwoord (eenmalig): ${adminPassword}`);
+  } else {
+    console.log('Admin gebruiker bestaat al — overgeslagen.');
+  }
   console.log('Seeding complete!');
 }
 
