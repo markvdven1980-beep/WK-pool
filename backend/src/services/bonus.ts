@@ -9,6 +9,22 @@ export interface BonusQuestion {
   group?: string;
 }
 
+// Officiële WK 2026 groepen (FIFA loting december 2025)
+export const OFFICIAL_GROUPS: Record<string, string[]> = {
+  A: ['Mexico', 'Zuid-Afrika', 'Zuid-Korea', 'Tsjechië'],
+  B: ['Canada', 'Bosnië-Herzegovina', 'Qatar', 'Zwitserland'],
+  C: ['Brazilië', 'Marokko', 'Haïti', 'Schotland'],
+  D: ['Verenigde Staten', 'Paraguay', 'Australië', 'Turkije'],
+  E: ['Duitsland', 'Ivoorkust', 'Ecuador', 'Curaçao'],
+  F: ['Nederland', 'Japan', 'Zweden', 'Tunesië'],
+  G: ['België', 'Egypte', 'Iran', 'Nieuw-Zeeland'],
+  H: ['Spanje', 'Kaapverdië', 'Saudi-Arabië', 'Uruguay'],
+  I: ['Frankrijk', 'Senegal', 'Irak', 'Noorwegen'],
+  J: ['Argentinië', 'Algerije', 'Oostenrijk', 'Jordanië'],
+  K: ['Portugal', 'DR Congo', 'Oezbekistan', 'Colombia'],
+  L: ['Engeland', 'Kroatië', 'Ghana', 'Panama'],
+};
+
 const GROUP_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
 
 export const BONUS_QUESTIONS: BonusQuestion[] = [

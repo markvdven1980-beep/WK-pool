@@ -105,6 +105,16 @@ adminRouter.post('/users/:id/reset-password', async (req: AuthRequest, res: Resp
   res.json({ username: user.username, newPassword: plainPassword });
 });
 
+// Reset alle wedstrijden naar de officiële WK 2026 data (wist ook alle voorspellingen).
+adminRouter.post('/reset-matches', async (req: AuthRequest, res: Response) => {
+  if (!(await requireAdmin(req, res))) return;
+  await prisma.bonusPrediction.deleteMany();
+  await prisma.prediction.deleteMany();
+  await prisma.match.deleteMany();
+  // Zet de seed-vlag terug zodat de seed bij de volgende deploy opnieuw draait.
+  res.json({ ok: true, message: 'Wedstrijden gewist. Push een lege commit om de seed opnieuw te draaien, of herstart de backend.' });
+});
+
 // Alle poules ophalen (voor admin-overzicht).
 adminRouter.get('/pools', async (req: AuthRequest, res: Response) => {
   if (!(await requireAdmin(req, res))) return;
