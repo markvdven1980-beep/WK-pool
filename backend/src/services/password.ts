@@ -2,23 +2,18 @@ import bcrypt from 'bcryptjs';
 
 // WK-thema woordenlijst voor wachtwoordgeneratie.
 const WK_WORDS = [
-  'Oranje', 'Voetbal', 'WK2026', 'Penalty', 'Keeper',
-  'Doelpunt', 'Offside', 'Tribune', 'Kampioen', 'Stadion',
+  'Oranje', 'Keeper', 'Penalty', 'Offside', 'Voetbal',
+  'Tribune', 'Kampioen', 'Corners', 'Referee', 'Vrijschop',
 ];
 
-const SPECIAL = ['!', '#', '@', '*'];
-
 /**
- * Genereert een WK-thema wachtwoord op basis van de gebruikersnaam.
- * Formaat: WKwoord + 3 letters van naam (hoofdletter) + 2 cijfers + speciaal teken
- * Voorbeeld: Oranje + MAR + 26 + ! → OranjeMAR26!
+ * Genereert een kort WK-thema wachtwoord.
+ * Formaat: WKwoord + 2 cijfers  →  bijv. Oranje47, Keeper82
  */
-export function generatePassword(username: string): string {
+export function generatePassword(_username: string): string {
   const word = WK_WORDS[Math.floor(Math.random() * WK_WORDS.length)];
-  const namePart = username.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase().padEnd(3, 'X');
   const num = Math.floor(Math.random() * 90 + 10); // 10–99
-  const special = SPECIAL[Math.floor(Math.random() * SPECIAL.length)];
-  return `${word}${namePart}${num}${special}`;
+  return `${word}${num}`;
 }
 
 export async function hashPassword(plain: string): Promise<string> {
