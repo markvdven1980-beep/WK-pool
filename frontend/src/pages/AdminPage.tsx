@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
-import type { Match, SyncResult, BonusQuestion } from '../api';
+import type { Match, SyncResult, BonusQuestion, AdminUser } from '../api';
 import { getFlag } from '../teams';
 import BonusInput from '../components/BonusInput';
 
@@ -85,6 +85,8 @@ export default function AdminPage() {
         )}
       </div>
 
+      <AdminUsersPanel />
+
       <AdminBonusPanel />
 
       <div className="flex gap-2">
@@ -105,6 +107,62 @@ export default function AdminPage() {
       <div className="space-y-3">
         {filtered.map((match) => (
           <AdminMatchRow key={match.id} match={match} onSubmit={handleResult} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AdminUsersPanel() {
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [resetResult, setResetResult] = useState<{ username: string; newPassword: string } | null>(null);
+
+  useEffect(() => {
+    api.admin.getUsers().then(setUsers);
+  }, []);
+
+  const handleReset = async (user: AdminUser) => {
+    if (!confirm(`Wachtwoord resetten voor ${user.name} (${user.username})?`)) return;
+    const result = await api.admin.resetPassword(user.id);
+    setResetResult(result);
+  };
+
+  return (
+    <div className="bg-wk-card rounded-xl p-4 border border-gray-700 space-y-3">
+      <div>
+        <h3 className="font-semibold">Gebruikersbeheer</h3>
+        <p className="text-xs text-gray-400">Wachtwoord resetten voor een deelnemer — het nieuwe wachtwoord wordt eenmalig getoond.</p>
+      </div>
+
+      {resetResult && (
+        <div className="bg-wk-darker border border-wk-gold/50 rounded-lg p-3 space-y-1">
+          <p className="text-xs text-gray-400">Nieuw wachtwoord voor <span className="text-white font-semibold">{resetResult.username}</span>:</p>
+          <p className="font-mono text-wk-gold font-bold text-lg tracking-widest">{resetResult.newPassword}</p>
+          <p className="text-xs text-gray-500">Geef dit door aan de deelnemer — daarna is het niet meer zichtbaar.</p>
+          <button onClick={() => setResetResult(null)} className="text-xs text-gray-400 hover:text-white mt-1">Sluiten</button>
+        </div>
+      )}
+
+      <div className="space-y-1 max-h-60 overflow-y-auto">
+        {users.map((user) => (
+          <div key={user.id} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-wk-darker">
+            <div className="flex items-center gap-2">
+              <span>{user.avatar}</span>
+              <div>
+                <span className="text-sm font-medium">{user.name}</span>
+                <span className="text-xs text-gray-500 ml-1">@{user.username}</span>
+              </div>
+              {user.isAdmin && <span className="text-xs bg-wk-gold/20 text-wk-gold px-1.5 rounded">Admin</span>}
+            </div>
+            {!user.isAdmin && (
+              <button
+                onClick={() => handleReset(user)}
+                className="text-xs text-gray-400 hover:text-wk-orange border border-gray-600 hover:border-wk-orange px-2 py-1 rounded transition-colors"
+              >
+                Reset wachtwoord
+              </button>
+            )}
+          </div>
         ))}
       </div>
     </div>

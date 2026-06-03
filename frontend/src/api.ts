@@ -26,9 +26,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 export const api = {
   auth: {
     register: (data: { username: string; name: string; email?: string }) =>
-      request<{ token: string; user: User }>('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
-    login: (username: string) =>
-      request<{ token: string; user: User }>('/auth/login', { method: 'POST', body: JSON.stringify({ username }) }),
+      request<{ token: string; user: User; generatedPassword: string }>('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+    login: (username: string, password: string) =>
+      request<{ token: string; user: User }>('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
     me: () => request<User>('/auth/me'),
   },
   matches: {
@@ -73,6 +73,9 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify({ question, answer }),
       }),
+    getUsers: () => request<AdminUser[]>('/admin/users'),
+    resetPassword: (userId: string) =>
+      request<{ username: string; newPassword: string }>(`/admin/users/${userId}/reset-password`, { method: 'POST' }),
   },
   bonus: {
     get: (poolId: string) => request<BonusData>(`/bonus?poolId=${poolId}`),
@@ -103,6 +106,15 @@ export interface BonusPrediction {
   answer: string;
   correct: boolean | null;
   points: number | null;
+}
+
+export interface AdminUser {
+  id: string;
+  username: string;
+  name: string;
+  avatar: string;
+  isAdmin: boolean;
+  createdAt: string;
 }
 
 export interface BonusData {

@@ -1,5 +1,6 @@
 import '../src/loadEnv';
 import { PrismaClient } from '@prisma/client';
+import { generatePassword, hashPassword } from '../src/services/password';
 
 const prisma = new PrismaClient();
 
@@ -170,6 +171,8 @@ async function main() {
 
   console.log(`Seeded ${matches.length} matches`);
 
+  const adminPassword = generatePassword('admin');
+  const adminHash = await hashPassword(adminPassword);
   const admin = await prisma.user.create({
     data: {
       username: 'admin',
@@ -177,10 +180,12 @@ async function main() {
       email: 'admin@wkpoule.nl',
       avatar: '👑',
       isAdmin: true,
+      passwordHash: adminHash,
     },
   });
 
   console.log(`Created admin user: ${admin.username}`);
+  console.log(`Admin password (eenmalig): ${adminPassword}`);
   console.log('Seeding complete!');
 }
 

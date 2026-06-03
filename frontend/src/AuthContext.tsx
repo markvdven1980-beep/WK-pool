@@ -6,8 +6,8 @@ import type { User } from './api';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (username: string) => Promise<void>;
-  register: (username: string, name: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<void>;
+  register: (username: string, name: string) => Promise<string>;
   logout: () => void;
 }
 
@@ -29,16 +29,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const login = async (username: string) => {
-    const { token, user } = await api.auth.login(username);
+  const login = async (username: string, password: string) => {
+    const { token, user } = await api.auth.login(username, password);
     localStorage.setItem('wk-token', token);
     setUser(user);
   };
 
-  const register = async (username: string, name: string) => {
-    const { token, user } = await api.auth.register({ username, name });
+  // Geeft het eenmalig gegenereerde wachtwoord terug aan de LoginPage.
+  const register = async (username: string, name: string): Promise<string> => {
+    const { token, user, generatedPassword } = await api.auth.register({ username, name });
     localStorage.setItem('wk-token', token);
     setUser(user);
+    return generatedPassword;
   };
 
   const logout = () => {

@@ -4,6 +4,7 @@ import { authMiddleware, AuthRequest } from '../middleware';
 import { recalcMatchPredictions } from '../services/recalc';
 import { syncResults } from '../services/resultsSync';
 import { BONUS_QUESTIONS, pointsForQuestion, answersMatch } from '../services/bonus';
+import { generatePassword, hashPassword } from '../services/password';
 
 const prisma = new PrismaClient();
 export const adminRouter = Router();
@@ -55,6 +56,30 @@ adminRouter.post('/sync', async (req: AuthRequest, res: Response) => {
   if (!(await requireAdmin(req, res))) return;
   const result = await syncResults(prisma);
   res.json(result);
+});
+
+// Alle gebruikers ophalen (voor admin-overzicht).
+adminRouter.get('/users', async (req: AuthRequest, res: Response) => {
+  if (!(await requireAdmin(req, res))) return;
+  const users = await prisma.user.findMany({
+    select: { id: true, username: true, name: true, avatar: true, isAdmin: true, createdAt: true },
+    orderBy: { createdAt: 'asc' },
+  });
+  res.json(users);
+});
+
+// Wachtwoord resetten — genereert nieuw WK-wachtwoord, toont het eenmalig.
+adminRouter.post('/users/:id/reset-password', async (req: AuthRequest, res: Response) => {
+  if (!(await requireAdmin(req, res))) return;
+  const user = await prisma.user.findUnique({ where: { id: req.params.id } });
+  if (!user) {
+    res.status(404).json({ error: 'Gebruiker niet gevonden' });
+    return;
+  }
+  const plainPassword = generatePassword(user.username);
+  const passwordHash = await hashPassword(plainPassword);
+  await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+  res.json({ username: user.username, newPassword: plainPassword });
 });
 
 // Stel het officiële antwoord op een bonusvraag in en ken punten toe.
