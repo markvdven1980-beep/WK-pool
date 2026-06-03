@@ -55,6 +55,24 @@ authRouter.post('/login', async (req: Request, res: Response) => {
   res.json({ token, user: { id: user.id, username: user.username, name: user.name, avatar: user.avatar, isAdmin: user.isAdmin } });
 });
 
+// Eenmalige bootstrap: stel het wachtwoord van de admin in als die nog geen hash heeft.
+// Werkt ALLEEN als de admin nog geen passwordHash heeft — daarna automatisch uitgeschakeld.
+authRouter.post('/bootstrap-admin', async (req: Request, res: Response) => {
+  const admin = await prisma.user.findUnique({ where: { username: 'admin' } });
+  if (!admin) {
+    res.status(404).json({ error: 'Geen admin-account gevonden' });
+    return;
+  }
+  if (admin.passwordHash) {
+    res.status(403).json({ error: 'Admin heeft al een wachtwoord — gebruik reset via admin-dashboard' });
+    return;
+  }
+  const plain = generatePassword('admin');
+  const hash = await hashPassword(plain);
+  await prisma.user.update({ where: { id: admin.id }, data: { passwordHash: hash } });
+  res.json({ message: 'Admin wachtwoord ingesteld', password: plain });
+});
+
 authRouter.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
   const user = await prisma.user.findUnique({ where: { id: req.userId } });
   if (!user) {
