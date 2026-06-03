@@ -7,7 +7,10 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (username: string, password: string) => Promise<void>;
+  // register geeft het wachtwoord terug maar logt nog NIET in.
+  // Pas na confirmLogin (na "Doorgaan"-klik) wordt de gebruiker ingelogd.
   register: (username: string, name: string) => Promise<string>;
+  confirmLogin: () => void;
   logout: () => void;
 }
 
@@ -16,6 +19,8 @@ const AuthContext = createContext<AuthContextType>(null!);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  // Bewaar token + user tijdelijk tot de gebruiker op "Doorgaan" klikt.
+  const [pendingAuth, setPendingAuth] = useState<{ token: string; user: User } | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem('wk-token');
@@ -35,12 +40,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(user);
   };
 
-  // Geeft het eenmalig gegenereerde wachtwoord terug aan de LoginPage.
   const register = async (username: string, name: string): Promise<string> => {
     const { token, user, generatedPassword } = await api.auth.register({ username, name });
-    localStorage.setItem('wk-token', token);
-    setUser(user);
+    // Sla token + user op, maar log nog NIET in zodat het wachtwoord getoond kan worden.
+    setPendingAuth({ token, user });
     return generatedPassword;
+  };
+
+  // Wordt aangeroepen als de gebruiker op "Doorgaan" klikt na het zien van het wachtwoord.
+  const confirmLogin = () => {
+    if (pendingAuth) {
+      localStorage.setItem('wk-token', pendingAuth.token);
+      setUser(pendingAuth.user);
+      setPendingAuth(null);
+    }
   };
 
   const logout = () => {
@@ -49,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, confirmLogin, logout }}>
       {children}
     </AuthContext.Provider>
   );

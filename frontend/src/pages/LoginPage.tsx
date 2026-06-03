@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../AuthContext';
 
 export default function LoginPage() {
-  const { login, register } = useAuth();
+  const { login, register, confirmLogin } = useAuth();
   const [isRegister, setIsRegister] = useState(false);
   const [username, setUsername] = useState('');
   const [name, setName] = useState('');
@@ -66,7 +66,7 @@ export default function LoginPage() {
               Schrijf dit wachtwoord op of sla het op. Als je het vergeet, kan de beheerder een nieuw wachtwoord aanmaken.
             </p>
             <button
-              onClick={() => setGeneratedPassword('')}
+              onClick={() => { setGeneratedPassword(''); confirmLogin(); }}
               className="w-full bg-wk-orange hover:bg-wk-orange-dark text-white font-semibold py-2.5 rounded-lg transition-colors"
             >
               Doorgaan naar de app →
