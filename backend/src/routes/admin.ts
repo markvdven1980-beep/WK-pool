@@ -58,28 +58,6 @@ adminRouter.post('/sync', async (req: AuthRequest, res: Response) => {
   res.json(result);
 });
 
-// TIJDELIJK: verwijder alle niet-admin gebruikers + hun data.
-adminRouter.delete('/users/all-non-admin', async (req: AuthRequest, res: Response) => {
-  if (!(await requireAdmin(req, res))) return;
-  const users = await prisma.user.findMany({ where: { isAdmin: false } });
-  const ids = users.map((u) => u.id);
-  if (ids.length === 0) { res.json({ deleted: 0 }); return; }
-  await prisma.bonusPrediction.deleteMany({ where: { userId: { in: ids } } });
-  await prisma.prediction.deleteMany({ where: { userId: { in: ids } } });
-  await prisma.poolMember.deleteMany({ where: { userId: { in: ids } } });
-  // Verwijder ook pools die door deze gebruikers zijn aangemaakt.
-  const pools = await prisma.pool.findMany({ where: { adminId: { in: ids } } });
-  const poolIds = pools.map((p) => p.id);
-  if (poolIds.length > 0) {
-    await prisma.bonusPrediction.deleteMany({ where: { poolId: { in: poolIds } } });
-    await prisma.prediction.deleteMany({ where: { poolId: { in: poolIds } } });
-    await prisma.poolMember.deleteMany({ where: { poolId: { in: poolIds } } });
-    await prisma.pool.deleteMany({ where: { id: { in: poolIds } } });
-  }
-  await prisma.user.deleteMany({ where: { id: { in: ids } } });
-  res.json({ deleted: ids.length, names: users.map((u) => u.username) });
-});
-
 // Alle gebruikers ophalen (voor admin-overzicht).
 adminRouter.get('/users', async (req: AuthRequest, res: Response) => {
   if (!(await requireAdmin(req, res))) return;
