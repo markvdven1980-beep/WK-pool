@@ -105,6 +105,28 @@ adminRouter.post('/users/:id/reset-password', async (req: AuthRequest, res: Resp
   res.json({ username: user.username, newPassword: plainPassword });
 });
 
+// Alle poules ophalen (voor admin-overzicht).
+adminRouter.get('/pools', async (req: AuthRequest, res: Response) => {
+  if (!(await requireAdmin(req, res))) return;
+  const pools = await prisma.pool.findMany({
+    include: { _count: { select: { members: true } } },
+    orderBy: { createdAt: 'asc' },
+  });
+  res.json(pools);
+});
+
+// Poule verwijderen inclusief alle data.
+adminRouter.delete('/pools/:id', async (req: AuthRequest, res: Response) => {
+  if (!(await requireAdmin(req, res))) return;
+  const pool = await prisma.pool.findUnique({ where: { id: req.params.id } });
+  if (!pool) { res.status(404).json({ error: 'Poule niet gevonden' }); return; }
+  await prisma.bonusPrediction.deleteMany({ where: { poolId: pool.id } });
+  await prisma.prediction.deleteMany({ where: { poolId: pool.id } });
+  await prisma.poolMember.deleteMany({ where: { poolId: pool.id } });
+  await prisma.pool.delete({ where: { id: pool.id } });
+  res.json({ deleted: pool.name });
+});
+
 // Stel het officiële antwoord op een bonusvraag in en ken punten toe.
 adminRouter.put('/bonus', async (req: AuthRequest, res: Response) => {
   if (!(await requireAdmin(req, res))) return;

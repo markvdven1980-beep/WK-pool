@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
-import type { Match, SyncResult, BonusQuestion, AdminUser } from '../api';
+import type { Match, SyncResult, BonusQuestion, AdminUser, AdminPool } from '../api';
 import { getFlag } from '../teams';
 import BonusInput from '../components/BonusInput';
 
@@ -85,6 +85,8 @@ export default function AdminPage() {
         )}
       </div>
 
+      <AdminPoolsPanel />
+
       <AdminUsersPanel />
 
       <AdminBonusPanel />
@@ -109,6 +111,52 @@ export default function AdminPage() {
           <AdminMatchRow key={match.id} match={match} onSubmit={handleResult} />
         ))}
       </div>
+    </div>
+  );
+}
+
+function AdminPoolsPanel() {
+  const [pools, setPools] = useState<AdminPool[]>([]);
+
+  useEffect(() => {
+    api.admin.getPools().then(setPools);
+  }, []);
+
+  const handleDelete = async (pool: AdminPool) => {
+    if (!confirm(`Poule "${pool.name}" verwijderen?\n\nAlle voorspellingen en scores in deze poule worden ook verwijderd. Dit kan niet ongedaan worden gemaakt.`)) return;
+    await api.admin.deletePool(pool.id);
+    setPools((prev) => prev.filter((p) => p.id !== pool.id));
+  };
+
+  return (
+    <div className="bg-wk-card rounded-xl p-4 border border-gray-700 space-y-3">
+      <div>
+        <h3 className="font-semibold">Poule beheer</h3>
+        <p className="text-xs text-gray-400">Verwijder poules inclusief alle voorspellingen en scores.</p>
+      </div>
+
+      {pools.length === 0 ? (
+        <p className="text-sm text-gray-500">Geen poules aangemaakt.</p>
+      ) : (
+        <div className="space-y-1 max-h-60 overflow-y-auto">
+          {pools.map((pool) => (
+            <div key={pool.id} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-wk-darker">
+              <div>
+                <span className="text-sm font-medium">{pool.name}</span>
+                <span className="text-xs text-gray-500 ml-2">
+                  {pool._count.members} deelnemer{pool._count.members !== 1 ? 's' : ''} · code: <span className="font-mono text-wk-orange">{pool.inviteCode}</span>
+                </span>
+              </div>
+              <button
+                onClick={() => handleDelete(pool)}
+                className="text-xs text-gray-400 hover:text-red-400 border border-gray-600 hover:border-red-400 px-2 py-1 rounded transition-colors shrink-0"
+              >
+                Verwijderen
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

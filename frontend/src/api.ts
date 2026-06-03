@@ -78,6 +78,9 @@ export const api = {
       request<{ username: string; newPassword: string }>(`/admin/users/${userId}/reset-password`, { method: 'POST' }),
     deleteUser: (userId: string) =>
       request<{ deleted: string }>(`/admin/users/${userId}`, { method: 'DELETE' }),
+    getPools: () => request<AdminPool[]>('/admin/pools'),
+    deletePool: (poolId: string) =>
+      request<{ deleted: string }>(`/admin/pools/${poolId}`, { method: 'DELETE' }),
   },
   bonus: {
     get: (poolId: string) => request<BonusData>(`/bonus?poolId=${poolId}`),
@@ -108,6 +111,15 @@ export interface BonusPrediction {
   answer: string;
   correct: boolean | null;
   points: number | null;
+}
+
+export interface AdminPool {
+  id: string;
+  name: string;
+  inviteCode: string;
+  adminId: string;
+  createdAt: string;
+  _count: { members: number };
 }
 
 export interface AdminUser {
