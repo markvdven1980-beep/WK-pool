@@ -52,6 +52,7 @@ export default function MatchCard({ match, prediction, poolId, onSave, showPredi
   const [errorMsg, setErrorMsg] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const lastSavedRef = useRef<string>('');
+  const awayRef = useRef<HTMLInputElement>(null);
 
   const status = getMatchStatus(match);
   const locked = isLocked(match);
@@ -100,10 +101,20 @@ export default function MatchCard({ match, prediction, poolId, onSave, showPredi
   }, []);
 
   const handleScoreChange = (field: 'home' | 'away', value: string) => {
-    const newHome = field === 'home' ? value : homeInput;
-    const newAway = field === 'away' ? value : awayInput;
-    if (field === 'home') setHomeInput(value);
-    else setAwayInput(value);
+    // Alleen cijfers 0-9 toestaan, max 1 karakter (niemand scoort 10+).
+    const clean = value.replace(/\D/g, '').slice(0, 1);
+    const newHome = field === 'home' ? clean : homeInput;
+    const newAway = field === 'away' ? clean : awayInput;
+    if (field === 'home') {
+      setHomeInput(clean);
+      // Spring automatisch naar het uitveld zodra een cijfer is ingevuld.
+      if (clean.length === 1) {
+        awayRef.current?.focus();
+        awayRef.current?.select();
+      }
+    } else {
+      setAwayInput(clean);
+    }
     const derived = deriveToto(newHome, newAway);
     const newToto = derived || toto;
     if (derived) setToto(derived);
@@ -205,21 +216,26 @@ export default function MatchCard({ match, prediction, poolId, onSave, showPredi
           ) : showPrediction && poolId && onSave ? (
             <div className="flex items-center gap-1">
               <input
-                type="number"
-                min="0"
-                max="20"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]"
+                maxLength={1}
                 value={homeInput}
                 onChange={(e) => handleScoreChange('home', e.target.value)}
+                onFocus={(e) => e.target.select()}
                 disabled={locked}
                 className="w-10 h-9 bg-wk-darker border border-gray-600 rounded text-center text-white text-sm focus:outline-none focus:border-wk-orange disabled:opacity-50"
               />
               <span className="text-gray-500">-</span>
               <input
-                type="number"
-                min="0"
-                max="20"
+                ref={awayRef}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]"
+                maxLength={1}
                 value={awayInput}
                 onChange={(e) => handleScoreChange('away', e.target.value)}
+                onFocus={(e) => e.target.select()}
                 disabled={locked}
                 className="w-10 h-9 bg-wk-darker border border-gray-600 rounded text-center text-white text-sm focus:outline-none focus:border-wk-orange disabled:opacity-50"
               />
