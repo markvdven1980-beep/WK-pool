@@ -81,6 +81,8 @@ export const api = {
     getPools: () => request<AdminPool[]>('/admin/pools'),
     deletePool: (poolId: string) =>
       request<{ deleted: string }>(`/admin/pools/${poolId}`, { method: 'DELETE' }),
+    fixMatchTimes: () =>
+      request<{ ok: boolean; updated: number; message: string }>('/admin/fix-match-times', { method: 'POST' }),
   },
   bonus: {
     get: (poolId: string) => request<BonusData>(`/bonus?poolId=${poolId}`),

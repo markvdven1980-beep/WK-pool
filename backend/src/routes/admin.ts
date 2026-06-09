@@ -115,6 +115,104 @@ adminRouter.post('/reset-matches', async (req: AuthRequest, res: Response) => {
   res.json({ ok: true, message: 'Wedstrijden gewist. Push een lege commit om de seed opnieuw te draaien, of herstart de backend.' });
 });
 
+// Corrigeer wedstrijdtijden naar officiële UTC-tijden (o.b.v. CBS Sports ET-schema).
+// Heeft GEEN effect op voorspellingen of scores — alleen matchDate wordt bijgewerkt.
+adminRouter.post('/fix-match-times', async (req: AuthRequest, res: Response) => {
+  if (!(await requireAdmin(req, res))) return;
+
+  // Alle 72 groepsfase tijden: omgezet van officiële ET-tijden (EDT = UTC-4) naar UTC.
+  const corrections: Record<number, string> = {
+    1:  '2026-06-11T19:00:00Z', // Mexico - Zuid-Afrika (3 PM ET = 21:00 CEST)
+    2:  '2026-06-12T02:00:00Z', // Zuid-Korea - Tsjechië (10 PM ET = 04:00 CEST)
+    3:  '2026-06-18T16:00:00Z', // Tsjechië - Zuid-Afrika (12 PM ET = 18:00 CEST)
+    4:  '2026-06-19T01:00:00Z', // Mexico - Zuid-Korea (9 PM ET = 03:00 CEST)
+    5:  '2026-06-25T01:00:00Z', // Tsjechië - Mexico (9 PM ET = 03:00 CEST)
+    6:  '2026-06-25T01:00:00Z', // Zuid-Afrika - Zuid-Korea (9 PM ET = 03:00 CEST)
+    7:  '2026-06-12T19:00:00Z', // Canada - Bosnië (3 PM ET = 21:00 CEST)
+    8:  '2026-06-13T19:00:00Z', // Qatar - Zwitserland (3 PM ET = 21:00 CEST)
+    9:  '2026-06-18T19:00:00Z', // Zwitserland - Bosnië (3 PM ET = 21:00 CEST)
+    10: '2026-06-18T22:00:00Z', // Canada - Qatar (6 PM ET = 00:00 CEST)
+    11: '2026-06-24T19:00:00Z', // Zwitserland - Canada (3 PM ET = 21:00 CEST)
+    12: '2026-06-24T19:00:00Z', // Bosnië - Qatar (3 PM ET = 21:00 CEST)
+    13: '2026-06-13T22:00:00Z', // Brazilië - Marokko (6 PM ET = 00:00 CEST)
+    14: '2026-06-14T01:00:00Z', // Haïti - Schotland (9 PM ET = 03:00 CEST)
+    15: '2026-06-19T22:00:00Z', // Schotland - Marokko (6 PM ET = 00:00 CEST)
+    16: '2026-06-20T01:00:00Z', // Brazilië - Haïti (9 PM ET = 03:00 CEST)
+    17: '2026-06-24T22:00:00Z', // Schotland - Brazilië (6 PM ET = 00:00 CEST)
+    18: '2026-06-24T22:00:00Z', // Marokko - Haïti (6 PM ET = 00:00 CEST)
+    19: '2026-06-13T01:00:00Z', // VS - Paraguay (9 PM ET = 03:00 CEST)
+    20: '2026-06-14T04:00:00Z', // Australië - Turkije (12 AM ET = 06:00 CEST)
+    21: '2026-06-19T19:00:00Z', // VS - Australië (3 PM ET = 21:00 CEST)
+    22: '2026-06-20T04:00:00Z', // Turkije - Paraguay (12 AM ET = 06:00 CEST)
+    23: '2026-06-26T02:00:00Z', // Turkije - VS (10 PM ET = 04:00 CEST)
+    24: '2026-06-26T02:00:00Z', // Paraguay - Australië (10 PM ET = 04:00 CEST)
+    25: '2026-06-14T17:00:00Z', // Duitsland - Curaçao (1 PM ET = 19:00 CEST)
+    26: '2026-06-14T23:00:00Z', // Ivoorkust - Ecuador (7 PM ET = 01:00 CEST)
+    27: '2026-06-20T20:00:00Z', // Duitsland - Ivoorkust (4 PM ET = 22:00 CEST)
+    28: '2026-06-21T00:00:00Z', // Ecuador - Curaçao (8 PM ET = 02:00 CEST)
+    29: '2026-06-25T20:00:00Z', // Ecuador - Duitsland (4 PM ET = 22:00 CEST)
+    30: '2026-06-25T20:00:00Z', // Curaçao - Ivoorkust (4 PM ET = 22:00 CEST)
+    31: '2026-06-14T20:00:00Z', // Nederland - Japan (4 PM ET = 22:00 CEST) ✓
+    32: '2026-06-15T02:00:00Z', // Zweden - Tunesië (10 PM ET = 04:00 CEST)
+    33: '2026-06-20T17:00:00Z', // Nederland - Zweden (1 PM ET = 19:00 CEST)
+    34: '2026-06-21T04:00:00Z', // Tunesië - Japan (12 AM ET = 06:00 CEST)
+    35: '2026-06-25T23:00:00Z', // Japan - Zweden (7 PM ET = 01:00 CEST)
+    36: '2026-06-25T23:00:00Z', // Tunesië - Nederland (7 PM ET = 01:00 CEST)
+    37: '2026-06-15T19:00:00Z', // België - Egypte (3 PM ET = 21:00 CEST)
+    38: '2026-06-16T01:00:00Z', // Iran - Nieuw-Zeeland (9 PM ET = 03:00 CEST)
+    39: '2026-06-21T19:00:00Z', // België - Iran (3 PM ET = 21:00 CEST)
+    40: '2026-06-22T01:00:00Z', // Nieuw-Zeeland - Egypte (9 PM ET = 03:00 CEST)
+    41: '2026-06-27T03:00:00Z', // Egypte - Iran (11 PM ET = 05:00 CEST)
+    42: '2026-06-27T03:00:00Z', // Nieuw-Zeeland - België (11 PM ET = 05:00 CEST)
+    43: '2026-06-15T16:00:00Z', // Spanje - Kaapverdië (12 PM ET = 18:00 CEST)
+    44: '2026-06-15T22:00:00Z', // Saudi-Arabië - Uruguay (6 PM ET = 00:00 CEST)
+    45: '2026-06-21T16:00:00Z', // Spanje - Saudi-Arabië (12 PM ET = 18:00 CEST)
+    46: '2026-06-21T22:00:00Z', // Uruguay - Kaapverdië (6 PM ET = 00:00 CEST)
+    47: '2026-06-27T00:00:00Z', // Kaapverdië - Saudi-Arabië (8 PM ET = 02:00 CEST)
+    48: '2026-06-27T00:00:00Z', // Uruguay - Spanje (8 PM ET = 02:00 CEST)
+    49: '2026-06-16T19:00:00Z', // Frankrijk - Senegal (3 PM ET = 21:00 CEST)
+    50: '2026-06-16T22:00:00Z', // Irak - Noorwegen (6 PM ET = 00:00 CEST)
+    51: '2026-06-22T21:00:00Z', // Frankrijk - Irak (5 PM ET = 23:00 CEST)
+    52: '2026-06-23T00:00:00Z', // Noorwegen - Senegal (8 PM ET = 02:00 CEST)
+    53: '2026-06-26T19:00:00Z', // Noorwegen - Frankrijk (3 PM ET = 21:00 CEST)
+    54: '2026-06-26T19:00:00Z', // Senegal - Irak (3 PM ET = 21:00 CEST)
+    55: '2026-06-17T01:00:00Z', // Argentinië - Algerije (9 PM ET = 03:00 CEST)
+    56: '2026-06-17T04:00:00Z', // Oostenrijk - Jordanië (12 AM ET = 06:00 CEST)
+    57: '2026-06-22T17:00:00Z', // Argentinië - Oostenrijk (1 PM ET = 19:00 CEST)
+    58: '2026-06-23T03:00:00Z', // Jordanië - Algerije (11 PM ET = 05:00 CEST)
+    59: '2026-06-28T02:00:00Z', // Algerije - Oostenrijk (10 PM ET = 04:00 CEST)
+    60: '2026-06-28T02:00:00Z', // Jordanië - Argentinië (10 PM ET = 04:00 CEST)
+    61: '2026-06-17T17:00:00Z', // Portugal - DR Congo (1 PM ET = 19:00 CEST)
+    62: '2026-06-18T02:00:00Z', // Oezbekistan - Colombia (10 PM ET = 04:00 CEST)
+    63: '2026-06-23T17:00:00Z', // Portugal - Oezbekistan (1 PM ET = 19:00 CEST)
+    64: '2026-06-24T02:00:00Z', // Colombia - DR Congo (10 PM ET = 04:00 CEST)
+    65: '2026-06-27T23:30:00Z', // Colombia - Portugal (7:30 PM ET = 01:30 CEST)
+    66: '2026-06-27T23:30:00Z', // DR Congo - Oezbekistan (7:30 PM ET = 01:30 CEST)
+    67: '2026-06-17T20:00:00Z', // Engeland - Kroatië (4 PM ET = 22:00 CEST)
+    68: '2026-06-17T23:00:00Z', // Ghana - Panama (7 PM ET = 01:00 CEST)
+    69: '2026-06-23T20:00:00Z', // Engeland - Ghana (4 PM ET = 22:00 CEST)
+    70: '2026-06-23T23:00:00Z', // Panama - Kroatië (7 PM ET = 01:00 CEST)
+    71: '2026-06-27T21:00:00Z', // Panama - Engeland (5 PM ET = 23:00 CEST)
+    72: '2026-06-27T21:00:00Z', // Kroatië - Ghana (5 PM ET = 23:00 CEST)
+  };
+
+  let updated = 0;
+  for (const [matchNumStr, dateStr] of Object.entries(corrections)) {
+    const matchNum = parseInt(matchNumStr);
+    const result = await prisma.match.updateMany({
+      where: { matchNum },
+      data: { matchDate: new Date(dateStr) },
+    });
+    updated += result.count;
+  }
+
+  res.json({
+    ok: true,
+    updated,
+    message: `${updated} wedstrijdtijden bijgewerkt naar officiële UTC-tijden. Voorspellingen zijn niet gewijzigd.`,
+  });
+});
+
 // Alle poules ophalen (voor admin-overzicht).
 adminRouter.get('/pools', async (req: AuthRequest, res: Response) => {
   if (!(await requireAdmin(req, res))) return;

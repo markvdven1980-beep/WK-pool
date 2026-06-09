@@ -40,12 +40,21 @@ export default function MatchesPage() {
     setPredictions((prev) => ({ ...prev, [matchId]: pred }));
   };
 
+  const NL_TZ = 'Europe/Amsterdam';
+
+  // Vergelijk datums altijd in Nederlandse tijdzone (CEST/CET), niet in browsertijdzone.
+  const todayNL = new Date().toLocaleDateString('nl-NL', {
+    timeZone: NL_TZ, year: 'numeric', month: '2-digit', day: '2-digit',
+  });
+
   const filteredMatches = matches.filter((m) => {
     if (filter === 'groep') return m.round === 'Groepsfase';
     if (filter === 'knockout') return m.round !== 'Groepsfase';
     if (filter === 'vandaag') {
-      const today = new Date().toDateString();
-      return new Date(m.matchDate).toDateString() === today;
+      const matchDayNL = new Date(m.matchDate).toLocaleDateString('nl-NL', {
+        timeZone: NL_TZ, year: 'numeric', month: '2-digit', day: '2-digit',
+      });
+      return matchDayNL === todayNL;
     }
     return true;
   }).filter((m) => {
@@ -59,6 +68,7 @@ export default function MatchesPage() {
 
   const matchesByDate = filteredMatches.reduce<Record<string, Match[]>>((acc, m) => {
     const dateKey = new Date(m.matchDate).toLocaleDateString('nl-NL', {
+      timeZone: NL_TZ,
       weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
     });
     (acc[dateKey] ||= []).push(m);

@@ -71,6 +71,7 @@ export default function AdminPage() {
             {syncing ? 'Synchroniseren...' : '🔄 Sync nu'}
           </button>
         </div>
+        <FixTimesButton />
         {syncMsg && (
           <div className={`text-sm rounded-lg p-3 ${syncMsg.ok ? 'bg-wk-darker text-gray-300' : 'bg-red-900/30 text-red-300'}`}>
             <p>{syncMsg.message}{syncMsg.ok && ` (${syncMsg.checked} wedstrijden gecontroleerd)`}</p>
@@ -288,6 +289,43 @@ function AdminBonusPanel() {
   );
 }
 
+function FixTimesButton() {
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<string>('');
+
+  const handleFix = async () => {
+    if (!confirm('Wedstrijdtijden bijwerken naar officiële UTC-tijden?\n\nVoorspellingen en scores worden NIET gewijzigd.')) return;
+    setLoading(true);
+    try {
+      const r = await api.admin.fixMatchTimes();
+      setResult(`✅ ${r.message}`);
+    } catch (err: any) {
+      setResult(`❌ ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="border-t border-gray-700 pt-3 space-y-2">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <p className="text-sm font-medium text-gray-300">⏰ Wedstrijdtijden corrigeren</p>
+          <p className="text-xs text-gray-500">Zet alle groepsfase-tijden op officiële UTC-waarden (o.b.v. CBS/FIFA schema). Voorspellingen blijven intact.</p>
+        </div>
+        <button
+          onClick={handleFix}
+          disabled={loading}
+          className="text-xs text-gray-300 hover:text-white border border-gray-600 hover:border-gray-400 px-3 py-1.5 rounded transition-colors disabled:opacity-50 shrink-0"
+        >
+          {loading ? 'Bezig...' : 'Tijden bijwerken'}
+        </button>
+      </div>
+      {result && <p className="text-xs text-gray-400">{result}</p>}
+    </div>
+  );
+}
+
 function AdminMatchRow({
   match,
   onSubmit,
@@ -299,6 +337,7 @@ function AdminMatchRow({
   const [awayScore, setAwayScore] = useState(match.awayScore?.toString() ?? '');
 
   const date = new Date(match.matchDate).toLocaleDateString('nl-NL', {
+    timeZone: 'Europe/Amsterdam',
     day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
   });
 

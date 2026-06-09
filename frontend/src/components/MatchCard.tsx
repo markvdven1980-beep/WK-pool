@@ -23,14 +23,23 @@ function isLocked(match: Match): boolean {
   return new Date() >= new Date(new Date(match.matchDate).getTime() - 60000);
 }
 
+const NL_TZ = 'Europe/Amsterdam';
+
 function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' });
+  return new Date(dateStr).toLocaleDateString('nl-NL', {
+    timeZone: NL_TZ,
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
 }
 
 function formatTime(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+  return new Date(dateStr).toLocaleTimeString('nl-NL', {
+    timeZone: NL_TZ,
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function deriveToto(home: string, away: string): string {
