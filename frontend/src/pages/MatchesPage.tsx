@@ -153,7 +153,7 @@ export default function MatchesPage() {
           <div className="space-y-3">
             {dayMatches.map((match) => (
               <MatchCard
-                key={match.id}
+                key={`${selectedPool}-${match.id}`}
                 match={match}
                 prediction={predictions[match.id]}
                 poolId={selectedPool}

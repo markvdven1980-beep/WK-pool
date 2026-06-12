@@ -213,6 +213,66 @@ adminRouter.post('/fix-match-times', async (req: AuthRequest, res: Response) => 
   });
 });
 
+// Synchroniseer bestaande voorspellingen naar alle poules van elke gebruiker.
+// Alleen-aanmaken: bestaande voorspellingen worden NOOIT gewijzigd of overschreven.
+// Lost op dat een gebruiker in twee poules in de tweede poule geen punten kreeg.
+adminRouter.post('/sync-predictions', async (req: AuthRequest, res: Response) => {
+  if (!(await requireAdmin(req, res))) return;
+
+  const users = await prisma.user.findMany({ select: { id: true } });
+  let created = 0;
+  const affectedMatchIds = new Set<string>();
+
+  for (const user of users) {
+    const memberships = await prisma.poolMember.findMany({
+      where: { userId: user.id },
+      select: { poolId: true },
+    });
+    if (memberships.length <= 1) continue; // niets te synchroniseren
+
+    const poolIds = memberships.map((m) => m.poolId);
+    const preds = await prisma.prediction.findMany({ where: { userId: user.id } });
+
+    // Bron-voorspelling per wedstrijd (eerst gevonden record wint).
+    const byMatch = new Map<string, (typeof preds)[number]>();
+    for (const p of preds) {
+      if (!byMatch.has(p.matchId)) byMatch.set(p.matchId, p);
+    }
+    // Bestaande (wedstrijd, poule)-combinaties — die laten we met rust.
+    const existing = new Set(preds.map((p) => `${p.matchId}:${p.poolId}`));
+
+    for (const [matchId, src] of byMatch) {
+      for (const poolId of poolIds) {
+        if (existing.has(`${matchId}:${poolId}`)) continue; // bestaat al → niet aanraken
+        await prisma.prediction.create({
+          data: {
+            userId: user.id,
+            matchId,
+            poolId,
+            homeScore: src.homeScore,
+            awayScore: src.awayScore,
+            toto: src.toto,
+          },
+        });
+        created++;
+        affectedMatchIds.add(matchId);
+      }
+    }
+  }
+
+  // Herbereken de punten voor alle wedstrijden waar records zijn bijgemaakt.
+  for (const matchId of affectedMatchIds) {
+    await recalcMatchPredictions(prisma, matchId);
+  }
+
+  res.json({
+    ok: true,
+    created,
+    matchesRecalculated: affectedMatchIds.size,
+    message: `${created} voorspelling(en) gesynchroniseerd naar alle poules. Bestaande voorspellingen zijn niet gewijzigd.`,
+  });
+});
+
 // Alle poules ophalen (voor admin-overzicht).
 adminRouter.get('/pools', async (req: AuthRequest, res: Response) => {
   if (!(await requireAdmin(req, res))) return;

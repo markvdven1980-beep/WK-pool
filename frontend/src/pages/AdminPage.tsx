@@ -72,6 +72,7 @@ export default function AdminPage() {
           </button>
         </div>
         <FixTimesButton />
+        <SyncPredictionsButton />
         {syncMsg && (
           <div className={`text-sm rounded-lg p-3 ${syncMsg.ok ? 'bg-wk-darker text-gray-300' : 'bg-red-900/30 text-red-300'}`}>
             <p>{syncMsg.message}{syncMsg.ok && ` (${syncMsg.checked} wedstrijden gecontroleerd)`}</p>
@@ -319,6 +320,43 @@ function FixTimesButton() {
           className="text-xs text-gray-300 hover:text-white border border-gray-600 hover:border-gray-400 px-3 py-1.5 rounded transition-colors disabled:opacity-50 shrink-0"
         >
           {loading ? 'Bezig...' : 'Tijden bijwerken'}
+        </button>
+      </div>
+      {result && <p className="text-xs text-gray-400">{result}</p>}
+    </div>
+  );
+}
+
+function SyncPredictionsButton() {
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<string>('');
+
+  const handleSync = async () => {
+    if (!confirm('Voorspellingen synchroniseren naar alle poules?\n\nDit maakt ontbrekende voorspellingen aan voor deelnemers die in meerdere poules zitten. Bestaande voorspellingen worden NIET gewijzigd.')) return;
+    setLoading(true);
+    try {
+      const r = await api.admin.syncPredictions();
+      setResult(`✅ ${r.message}`);
+    } catch (err: any) {
+      setResult(`❌ ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="border-t border-gray-700 pt-3 space-y-2">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <p className="text-sm font-medium text-gray-300">🔁 Voorspellingen synchroniseren</p>
+          <p className="text-xs text-gray-500">Zorgt dat voorspellingen in álle poules van een deelnemer meetellen. Maakt alleen ontbrekende records aan — bestaande blijven intact.</p>
+        </div>
+        <button
+          onClick={handleSync}
+          disabled={loading}
+          className="text-xs text-gray-300 hover:text-white border border-gray-600 hover:border-gray-400 px-3 py-1.5 rounded transition-colors disabled:opacity-50 shrink-0"
+        >
+          {loading ? 'Bezig...' : 'Synchroniseren'}
         </button>
       </div>
       {result && <p className="text-xs text-gray-400">{result}</p>}

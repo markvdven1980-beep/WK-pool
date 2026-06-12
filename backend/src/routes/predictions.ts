@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authMiddleware, AuthRequest } from '../middleware';
+import { recalcMatchPredictions } from '../services/recalc';
 
 const prisma = new PrismaClient();
 export const predictionRouter = Router();
@@ -54,19 +55,39 @@ predictionRouter.post('/', async (req: AuthRequest, res: Response) => {
     return;
   }
 
-  const prediction = await prisma.prediction.upsert({
-    where: {
-      userId_matchId_poolId: { userId: req.userId!, matchId, poolId },
-    },
-    update: { homeScore, awayScore, toto: totoValue },
-    create: {
-      userId: req.userId!,
-      matchId,
-      poolId,
-      homeScore,
-      awayScore,
-      toto: totoValue,
-    },
+  // Eén voorspelling geldt voor ALLE poules van de gebruiker: schrijf hetzelfde
+  // record naar elke poule waar de gebruiker lid van is, zodat de punten in elke
+  // poule meetellen. (Voorheen ging dit alleen naar de geselecteerde poule.)
+  const memberships = await prisma.poolMember.findMany({
+    where: { userId: req.userId! },
+    select: { poolId: true },
+  });
+
+  for (const m of memberships) {
+    await prisma.prediction.upsert({
+      where: {
+        userId_matchId_poolId: { userId: req.userId!, matchId, poolId: m.poolId },
+      },
+      update: { homeScore, awayScore, toto: totoValue },
+      create: {
+        userId: req.userId!,
+        matchId,
+        poolId: m.poolId,
+        homeScore,
+        awayScore,
+        toto: totoValue,
+      },
+    });
+  }
+
+  // Mocht de uitslag al bekend zijn, herbereken meteen de punten voor deze wedstrijd.
+  if (match.homeScore !== null && match.awayScore !== null) {
+    await recalcMatchPredictions(prisma, matchId);
+  }
+
+  // Geef het record van de gevraagde poule terug (voor de UI).
+  const prediction = await prisma.prediction.findUnique({
+    where: { userId_matchId_poolId: { userId: req.userId!, matchId, poolId } },
   });
 
   res.json(prediction);
