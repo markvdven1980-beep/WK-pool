@@ -5,64 +5,101 @@ const API_BASE = 'https://api.football-data.org/v4';
 const COMPETITION = 'WC'; // FIFA World Cup
 
 // football-data.org gebruikt Engelse landnamen; wij gebruiken Nederlandse.
+// Alle keys zijn accent- en hoofdletterloos (zie normalize). Per land staan
+// meerdere mogelijke API-namen, omdat football-data.org soms varianten gebruikt
+// (bijv. "Korea Republic" vs "South Korea", "Türkiye" vs "Turkey").
 const NAME_MAP: Record<string, string> = {
-  'united states': 'Verenigde Staten',
-  'usa': 'Verenigde Staten',
-  'panama': 'Panama',
-  'uruguay': 'Uruguay',
-  'bolivia': 'Bolivia',
-  'argentina': 'Argentinië',
-  'peru': 'Peru',
-  'canada': 'Canada',
-  'morocco': 'Marokko',
-  'spain': 'Spanje',
-  'brazil': 'Brazilië',
-  'japan': 'Japan',
-  'serbia': 'Servië',
-  'france': 'Frankrijk',
-  'australia': 'Australië',
-  'costa rica': 'Costa Rica',
-  'england': 'Engeland',
+  // Groep A
   'mexico': 'Mexico',
-  'ecuador': 'Ecuador',
-  'portugal': 'Portugal',
-  'ivory coast': 'Ivoorkust',
-  "cote d'ivoire": 'Ivoorkust',
-  'netherlands': 'Nederland',
-  'sweden': 'Zweden',
-  'tunisia': 'Tunesië',
-  'germany': 'Duitsland',
-  'scotland': 'Schotland',
-  'colombia': 'Colombia',
-  'algeria': 'Algerije',
-  'croatia': 'Kroatië',
-  'senegal': 'Senegal',
-  'nigeria': 'Nigeria',
-  'new zealand': 'Nieuw-Zeeland',
-  'italy': 'Italië',
-  'belgium': 'België',
-  'paraguay': 'Paraguay',
-  'kenya': 'Kenia',
+  'south africa': 'Zuid-Afrika',
   'south korea': 'Zuid-Korea',
   'korea republic': 'Zuid-Korea',
-  'ghana': 'Ghana',
-  'poland': 'Polen',
-  'venezuela': 'Venezuela',
-  'switzerland': 'Zwitserland',
-  'ukraine': 'Oekraïne',
-  'egypt': 'Egypte',
-  'curacao': 'Curaçao',
-  'curaçao': 'Curaçao',
-  'turkey': 'Turkije',
-  'türkiye': 'Turkije',
-  'czech republic': 'Tsjechië',
+  'korea south': 'Zuid-Korea',
   'czechia': 'Tsjechië',
-  'cameroon': 'Kameroen',
-  'honduras': 'Honduras',
+  'czech republic': 'Tsjechië',
+  // Groep B
+  'canada': 'Canada',
+  'bosnia and herzegovina': 'Bosnië-Herzegovina',
+  'bosnia-herzegovina': 'Bosnië-Herzegovina',
+  'bosnia & herzegovina': 'Bosnië-Herzegovina',
+  'bosnia': 'Bosnië-Herzegovina',
+  'qatar': 'Qatar',
+  'switzerland': 'Zwitserland',
+  // Groep C
+  'brazil': 'Brazilië',
+  'morocco': 'Marokko',
+  'haiti': 'Haïti',
+  'scotland': 'Schotland',
+  // Groep D
+  'united states': 'Verenigde Staten',
+  'united states of america': 'Verenigde Staten',
+  'usa': 'Verenigde Staten',
+  'paraguay': 'Paraguay',
+  'australia': 'Australië',
+  'turkey': 'Turkije',
+  'turkiye': 'Turkije',
+  // Groep E
+  'germany': 'Duitsland',
+  'ivory coast': 'Ivoorkust',
+  "cote d'ivoire": 'Ivoorkust',
+  'ecuador': 'Ecuador',
+  'curacao': 'Curaçao',
+  // Groep F
+  'netherlands': 'Nederland',
+  'holland': 'Nederland',
+  'japan': 'Japan',
+  'sweden': 'Zweden',
+  'tunisia': 'Tunesië',
+  // Groep G
+  'belgium': 'België',
+  'egypt': 'Egypte',
+  'iran': 'Iran',
+  'ir iran': 'Iran',
+  'iran islamic republic': 'Iran',
+  'new zealand': 'Nieuw-Zeeland',
+  // Groep H
+  'spain': 'Spanje',
+  'cape verde': 'Kaapverdië',
+  'cabo verde': 'Kaapverdië',
+  'cape verde islands': 'Kaapverdië',
+  'saudi arabia': 'Saudi-Arabië',
+  'uruguay': 'Uruguay',
+  // Groep I
+  'france': 'Frankrijk',
+  'senegal': 'Senegal',
+  'iraq': 'Irak',
+  'norway': 'Noorwegen',
+  // Groep J
+  'argentina': 'Argentinië',
+  'algeria': 'Algerije',
+  'austria': 'Oostenrijk',
+  'jordan': 'Jordanië',
+  // Groep K
+  'portugal': 'Portugal',
+  'dr congo': 'DR Congo',
+  'congo dr': 'DR Congo',
+  'democratic republic of congo': 'DR Congo',
+  'democratic republic of the congo': 'DR Congo',
+  'congo democratic republic': 'DR Congo',
+  'uzbekistan': 'Oezbekistan',
+  'colombia': 'Colombia',
+  // Groep L
+  'england': 'Engeland',
+  'croatia': 'Kroatië',
+  'ghana': 'Ghana',
+  'panama': 'Panama',
 };
 
+// Lowercase, strip accenten en veelvoorkomende suffixen, zodat "Türkiye",
+// "Côte d'Ivoire" en "Curaçao" matchen met de accentloze keys hierboven.
 function normalize(name: string): string {
-  return name.toLowerCase().replace(/\s+fc$|\s+national team$/i, '').trim();
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // diakritische tekens (accenten) verwijderen
+    .replace(/\s+fc$|\s+national team$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function toDutch(apiName: string): string | null {
@@ -77,6 +114,7 @@ interface SyncResult {
   updated: number;
   message: string;
   updatedMatches: { matchNum: number; homeTeam: string; awayTeam: string; score: string }[];
+  unmatched?: string[];
 }
 
 export async function syncResults(prisma: PrismaClient): Promise<SyncResult> {
@@ -101,14 +139,23 @@ export async function syncResults(prisma: PrismaClient): Promise<SyncResult> {
   const apiMatches: any[] = data.matches || [];
   const ourMatches = await prisma.match.findMany();
   const updatedMatches: SyncResult['updatedMatches'] = [];
+  // Onbekende landnamen verzamelen, zodat de admin ziet waarom een afgeronde
+  // wedstrijd niet automatisch werd verwerkt (en hem handmatig kan invullen).
+  const unmatchedSet = new Set<string>();
   let updated = 0;
 
   for (const apiMatch of apiMatches) {
-    const home = toDutch(apiMatch.homeTeam?.name);
-    const away = toDutch(apiMatch.awayTeam?.name);
+    const homeRaw = apiMatch.homeTeam?.name;
+    const awayRaw = apiMatch.awayTeam?.name;
+    const home = toDutch(homeRaw);
+    const away = toDutch(awayRaw);
     // football-data fullTime is de stand na verlenging, exclusief strafschoppen.
     const homeScore = apiMatch.score?.fullTime?.home;
     const awayScore = apiMatch.score?.fullTime?.away;
+
+    // Noteer onherkende landnamen van afgeronde wedstrijden voor diagnose.
+    if (homeRaw && !home) unmatchedSet.add(homeRaw);
+    if (awayRaw && !away) unmatchedSet.add(awayRaw);
 
     if (!home || !away || homeScore === null || homeScore === undefined || awayScore === null || awayScore === undefined) {
       continue;
@@ -145,11 +192,22 @@ export async function syncResults(prisma: PrismaClient): Promise<SyncResult> {
     });
   }
 
+  const unmatched = [...unmatchedSet];
+  if (unmatched.length > 0) {
+    console.warn('[sync] onbekende landnamen (niet in NAME_MAP):', unmatched.join(', '));
+  }
+
+  let message = updated > 0 ? `${updated} uitslag(en) bijgewerkt` : 'Geen nieuwe uitslagen';
+  if (unmatched.length > 0) {
+    message += ` — ${unmatched.length} onbekende landnaam/-namen: ${unmatched.join(', ')}`;
+  }
+
   return {
     ok: true,
     checked: apiMatches.length,
     updated,
-    message: updated > 0 ? `${updated} uitslag(en) bijgewerkt` : 'Geen nieuwe uitslagen',
+    message,
     updatedMatches,
+    unmatched,
   };
 }
