@@ -41,7 +41,15 @@ authRouter.post('/login', async (req: Request, res: Response) => {
     res.status(400).json({ error: 'Gebruikersnaam en wachtwoord zijn verplicht' });
     return;
   }
-  const user = await prisma.user.findUnique({ where: { username } });
+  // Exacte match eerst; valt terug op hoofdletter-ongevoelig zoeken zodat
+  // mobiele auto-capitalisatie (bijv. "Mariekevandeven" i.p.v. "mariekevandeven")
+  // of een afwijkende casing geen inlogfout veroorzaakt.
+  let user = await prisma.user.findUnique({ where: { username } });
+  if (!user) {
+    const target = username.trim().toLowerCase();
+    const all = await prisma.user.findMany();
+    user = all.find((u) => u.username.toLowerCase() === target) ?? null;
+  }
   if (!user || !user.passwordHash) {
     res.status(401).json({ error: 'Gebruikersnaam of wachtwoord onjuist' });
     return;

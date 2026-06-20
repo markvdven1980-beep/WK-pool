@@ -19,10 +19,12 @@ export default function LoginPage() {
     setLoading(true);
     try {
       if (isRegister) {
-        const pwd = await register(username, name);
+        const pwd = await register(username.trim(), name.trim());
         if (pwd) setGeneratedPassword(pwd);
       } else {
-        await login(username, password);
+        // Trim om meegekopieerde spaties te voorkomen; backend matcht de
+        // gebruikersnaam hoofdletter-ongevoelig.
+        await login(username.trim(), password.trim());
       }
     } catch (err: any) {
       setError(err.message);
@@ -113,6 +115,10 @@ export default function LoginPage() {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                autoComplete="username"
                 className="w-full bg-wk-darker border border-gray-600 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-wk-orange"
                 placeholder="bijv. mark_v"
                 required
@@ -141,6 +147,10 @@ export default function LoginPage() {
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    autoComplete="current-password"
                     className="w-full bg-wk-darker border border-gray-600 rounded-lg px-4 py-2.5 pr-11 text-white focus:outline-none focus:border-wk-orange"
                     placeholder="Jouw wachtwoord"
                     required
