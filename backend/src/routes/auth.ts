@@ -7,12 +7,18 @@ const prisma = new PrismaClient();
 export const authRouter = Router();
 
 authRouter.post('/register', async (req: Request, res: Response) => {
-  const { username, name, email } = req.body;
+  // Trim om spaties aan begin/eind te voorkomen (anders mislukt inloggen later).
+  const username = (req.body.username ?? '').trim();
+  const name = (req.body.name ?? '').trim();
+  const email = req.body.email?.trim() || null;
   if (!username || !name) {
     res.status(400).json({ error: 'Gebruikersnaam en naam zijn verplicht' });
     return;
   }
-  const existing = await prisma.user.findUnique({ where: { username } });
+  // Hoofdletter-ongevoelig controleren of de gebruikersnaam al bestaat.
+  const target = username.toLowerCase();
+  const all = await prisma.user.findMany();
+  const existing = all.find((u) => u.username.trim().toLowerCase() === target);
   if (existing) {
     res.status(409).json({ error: 'Gebruikersnaam is al in gebruik' });
     return;
@@ -46,9 +52,12 @@ authRouter.post('/login', async (req: Request, res: Response) => {
   // of een afwijkende casing geen inlogfout veroorzaakt.
   let user = await prisma.user.findUnique({ where: { username } });
   if (!user) {
+    // Vergelijk hoofdletter- én spatie-ongevoelig: sommige gebruikersnamen zijn
+    // met een spatie aan het begin/eind opgeslagen, en mobiele toetsenborden
+    // capitaliseren de eerste letter. Trim daarom beide kanten.
     const target = username.trim().toLowerCase();
     const all = await prisma.user.findMany();
-    user = all.find((u) => u.username.toLowerCase() === target) ?? null;
+    user = all.find((u) => u.username.trim().toLowerCase() === target) ?? null;
   }
   if (!user || !user.passwordHash) {
     res.status(401).json({ error: 'Gebruikersnaam of wachtwoord onjuist' });

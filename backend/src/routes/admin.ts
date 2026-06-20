@@ -213,6 +213,46 @@ adminRouter.post('/fix-match-times', async (req: AuthRequest, res: Response) => 
   });
 });
 
+// Verwijder spaties aan begin/eind van bestaande gebruikersnamen (en namen).
+// Lost op dat inloggen mislukte doordat een gebruikersnaam met een spatie werd
+// opgeslagen. Raakt voorspellingen/scores niet aan; slaat namen over die na het
+// trimmen met een andere gebruiker zouden botsen.
+adminRouter.post('/clean-usernames', async (req: AuthRequest, res: Response) => {
+  if (!(await requireAdmin(req, res))) return;
+
+  const users = await prisma.user.findMany();
+  const cleaned: { from: string; to: string }[] = [];
+  const skipped: string[] = [];
+
+  for (const u of users) {
+    const trimmedUser = u.username.trim();
+    const trimmedName = u.name.trim();
+    if (trimmedUser === u.username && trimmedName === u.name) continue; // niets te doen
+
+    // Controleer op botsing met een andere gebruiker na het trimmen.
+    const clash = users.some(
+      (o) => o.id !== u.id && o.username.trim().toLowerCase() === trimmedUser.toLowerCase()
+    );
+    if (clash) {
+      skipped.push(u.username);
+      continue;
+    }
+
+    await prisma.user.update({
+      where: { id: u.id },
+      data: { username: trimmedUser, name: trimmedName },
+    });
+    if (trimmedUser !== u.username) cleaned.push({ from: u.username, to: trimmedUser });
+  }
+
+  res.json({
+    ok: true,
+    cleaned,
+    skipped,
+    message: `${cleaned.length} gebruikersnaam/-namen opgeschoond${skipped.length ? `, ${skipped.length} overgeslagen wegens botsing` : ''}.`,
+  });
+});
+
 // Synchroniseer bestaande voorspellingen naar alle poules van elke gebruiker.
 // Alleen-aanmaken: bestaande voorspellingen worden NOOIT gewijzigd of overschreven.
 // Lost op dat een gebruiker in twee poules in de tweede poule geen punten kreeg.
