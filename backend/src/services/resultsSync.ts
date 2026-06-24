@@ -108,6 +108,30 @@ function toDutch(apiName: string): string | null {
   return NAME_MAP[key] ?? null;
 }
 
+// Alle echte landnamen (waarden uit NAME_MAP). Onze knockout-wedstrijden bevatten
+// placeholders ("Winnaar A", "Nr. 2 B"), die niet in deze set zitten.
+const REAL_TEAMS = new Set(Object.values(NAME_MAP));
+function isPlaceholderTeam(team: string): boolean {
+  return !REAL_TEAMS.has(team);
+}
+
+// football-data.org "stage" → onze ronde-naam. Meerdere varianten omdat de exacte
+// benaming per editie kan verschillen (en het 48-team formaat een Round of 32 heeft).
+const STAGE_TO_ROUND: Record<string, string> = {
+  LAST_32: 'Zestiende finale',
+  ROUND_OF_32: 'Zestiende finale',
+  LAST_16: 'Achtste finale',
+  ROUND_OF_16: 'Achtste finale',
+  QUARTER_FINALS: 'Kwartfinale',
+  QUARTER_FINAL: 'Kwartfinale',
+  SEMI_FINALS: 'Halve finale',
+  SEMI_FINAL: 'Halve finale',
+  THIRD_PLACE: 'Troostfinale',
+  THIRD_PLACE_PLAYOFF: 'Troostfinale',
+  PLAY_OFF_FOR_THIRD_PLACE: 'Troostfinale',
+  FINAL: 'Finale',
+};
+
 interface SyncResult {
   ok: boolean;
   checked: number;
@@ -115,6 +139,64 @@ interface SyncResult {
   message: string;
   updatedMatches: { matchNum: number; homeTeam: string; awayTeam: string; score: string }[];
   unmatched?: string[];
+  teamsFilled?: { matchNum: number; homeTeam: string; awayTeam: string }[];
+}
+
+/**
+ * Vult automatisch de teams van knockout-wedstrijden in zodra die bij
+ * football-data.org bekend zijn. Conservatief:
+ *  - vult alleen placeholders in, overschrijft nooit een al ingevuld echt team
+ *    (zo blijft een handmatige correctie van de admin staan);
+ *  - koppelt football-data-wedstrijden aan onze wedstrijden per ronde, op
+ *    chronologische volgorde, en alleen als de aantallen exact overeenkomen.
+ * Past de meegegeven ourMatches in-memory aan, zodat de uitslagen-sync daarna
+ * meteen de nieuwe teams kan gebruiken.
+ */
+async function fillKnockoutTeams(
+  prisma: PrismaClient,
+  apiMatches: any[],
+  ourMatches: { id: string; matchNum: number; round: string; homeTeam: string; awayTeam: string }[]
+): Promise<SyncResult['teamsFilled']> {
+  const filled: NonNullable<SyncResult['teamsFilled']> = [];
+
+  // Groepeer football-data knockout-wedstrijden per onze ronde.
+  const apiByRound = new Map<string, any[]>();
+  for (const am of apiMatches) {
+    const round = STAGE_TO_ROUND[am.stage];
+    if (!round) continue;
+    (apiByRound.get(round) ?? apiByRound.set(round, []).get(round)!).push(am);
+  }
+
+  for (const [round, apiRoundMatches] of apiByRound) {
+    const sortedApi = [...apiRoundMatches].sort(
+      (a, b) => new Date(a.utcDate).getTime() - new Date(b.utcDate).getTime()
+    );
+    const ourRound = ourMatches.filter((m) => m.round === round).sort((a, b) => a.matchNum - b.matchNum);
+    // Structuur wijkt af → niet gokken, laat de admin het handmatig doen.
+    if (sortedApi.length === 0 || sortedApi.length !== ourRound.length) continue;
+
+    for (let i = 0; i < ourRound.length; i++) {
+      const our = ourRound[i];
+      const apiHome = toDutch(sortedApi[i].homeTeam?.name);
+      const apiAway = toDutch(sortedApi[i].awayTeam?.name);
+      if (!apiHome || !apiAway) continue; // teams nog niet bekend/vertaalbaar
+
+      // Alleen placeholders invullen; bestaande echte teams met rust laten.
+      const newHome = isPlaceholderTeam(our.homeTeam) ? apiHome : our.homeTeam;
+      const newAway = isPlaceholderTeam(our.awayTeam) ? apiAway : our.awayTeam;
+      if (newHome === our.homeTeam && newAway === our.awayTeam) continue;
+
+      await prisma.match.update({
+        where: { id: our.id },
+        data: { homeTeam: newHome, awayTeam: newAway },
+      });
+      our.homeTeam = newHome; // in-memory bijwerken voor de uitslagen-sync hierna
+      our.awayTeam = newAway;
+      filled.push({ matchNum: our.matchNum, homeTeam: newHome, awayTeam: newAway });
+    }
+  }
+
+  return filled;
 }
 
 export async function syncResults(prisma: PrismaClient): Promise<SyncResult> {
@@ -125,7 +207,9 @@ export async function syncResults(prisma: PrismaClient): Promise<SyncResult> {
 
   let data: any;
   try {
-    const res = await fetch(`${API_BASE}/competitions/${COMPETITION}/matches?status=FINISHED`, {
+    // Alle wedstrijden ophalen (niet alleen FINISHED): zo zien we ook de teams
+    // van knockout-wedstrijden zodra die bekend zijn, nog vóór ze gespeeld zijn.
+    const res = await fetch(`${API_BASE}/competitions/${COMPETITION}/matches`, {
       headers: { 'X-Auth-Token': apiKey },
     });
     if (!res.ok) {
@@ -138,6 +222,10 @@ export async function syncResults(prisma: PrismaClient): Promise<SyncResult> {
 
   const apiMatches: any[] = data.matches || [];
   const ourMatches = await prisma.match.findMany();
+
+  // Stap 1: vul automatisch de knockout-teams in zodra die bekend zijn.
+  const teamsFilled = await fillKnockoutTeams(prisma, apiMatches, ourMatches);
+
   const updatedMatches: SyncResult['updatedMatches'] = [];
   // Onbekende landnamen verzamelen, zodat de admin ziet waarom een afgeronde
   // wedstrijd niet automatisch werd verwerkt (en hem handmatig kan invullen).
@@ -197,7 +285,15 @@ export async function syncResults(prisma: PrismaClient): Promise<SyncResult> {
     console.warn('[sync] onbekende landnamen (niet in NAME_MAP):', unmatched.join(', '));
   }
 
+  const filled = teamsFilled ?? [];
+  if (filled.length > 0) {
+    console.log('[sync] knockout-teams ingevuld:', filled.map((f) => `#${f.matchNum} ${f.homeTeam}-${f.awayTeam}`).join(', '));
+  }
+
   let message = updated > 0 ? `${updated} uitslag(en) bijgewerkt` : 'Geen nieuwe uitslagen';
+  if (filled.length > 0) {
+    message += ` — ${filled.length} knockout-wedstrijd(en) van teams voorzien`;
+  }
   if (unmatched.length > 0) {
     message += ` — ${unmatched.length} onbekende landnaam/-namen: ${unmatched.join(', ')}`;
   }
@@ -209,5 +305,6 @@ export async function syncResults(prisma: PrismaClient): Promise<SyncResult> {
     message,
     updatedMatches,
     unmatched,
+    teamsFilled: filled,
   };
 }

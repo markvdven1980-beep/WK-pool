@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
 import type { Match, SyncResult, BonusQuestion, AdminUser, AdminPool } from '../api';
-import { getFlag } from '../teams';
+import { getFlag, ALL_TEAMS } from '../teams';
 import BonusInput from '../components/BonusInput';
 
 export default function AdminPage() {
@@ -83,6 +83,16 @@ export default function AdminPage() {
                 ))}
               </ul>
             )}
+            {syncMsg.teamsFilled && syncMsg.teamsFilled.length > 0 && (
+              <div className="mt-2">
+                <p className="text-xs text-wk-gold">Automatisch ingevulde knockout-teams (controleer ze):</p>
+                <ul className="mt-1 text-xs text-gray-400">
+                  {syncMsg.teamsFilled.map((m) => (
+                    <li key={m.matchNum}>#{m.matchNum} {m.homeTeam} - {m.awayTeam}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -92,6 +102,8 @@ export default function AdminPage() {
       <AdminUsersPanel />
 
       <AdminBonusPanel />
+
+      <KnockoutTeamsPanel />
 
       <div className="flex gap-2">
         <button
@@ -323,6 +335,132 @@ function FixTimesButton() {
         </button>
       </div>
       {result && <p className="text-xs text-gray-400">{result}</p>}
+    </div>
+  );
+}
+
+// Een team is nog niet bekend zolang het een placeholder is (geen echt land).
+function isPlaceholder(team: string): boolean {
+  return !ALL_TEAMS.includes(team);
+}
+
+function KnockoutTeamsPanel() {
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [savingId, setSavingId] = useState<string>('');
+  const [msg, setMsg] = useState('');
+
+  const load = () =>
+    api.matches.list().then((ms) => setMatches(ms.filter((m) => !m.group).sort((a, b) => a.matchNum - b.matchNum)));
+
+  useEffect(() => { load(); }, []);
+
+  const handleSave = async (match: Match, homeTeam: string, awayTeam: string) => {
+    setSavingId(match.id);
+    try {
+      await api.admin.setTeams(match.id, homeTeam, awayTeam);
+      setMsg(`Wedstrijd #${match.matchNum} bijgewerkt: ${homeTeam} - ${awayTeam}`);
+      setMatches((prev) => prev.map((m) => (m.id === match.id ? { ...m, homeTeam, awayTeam } : m)));
+      setTimeout(() => setMsg(''), 4000);
+    } catch (err: any) {
+      setMsg(`Fout: ${err.message}`);
+    } finally {
+      setSavingId('');
+    }
+  };
+
+  if (matches.length === 0) return null;
+
+  // Groepeer per ronde, in de volgorde waarin ze gespeeld worden.
+  const byRound = matches.reduce<Record<string, Match[]>>((acc, m) => {
+    (acc[m.round] ||= []).push(m);
+    return acc;
+  }, {});
+  const openCount = matches.filter((m) => isPlaceholder(m.homeTeam) || isPlaceholder(m.awayTeam)).length;
+
+  return (
+    <div className="bg-wk-card rounded-xl p-4 border border-gray-700 space-y-3">
+      <div>
+        <h3 className="font-semibold">Knockout-teams instellen</h3>
+        <p className="text-xs text-gray-400">
+          Vul per wedstrijd de teams in zodra ze bekend zijn. {openCount > 0
+            ? `Nog ${openCount} wedstrijd${openCount !== 1 ? 'en' : ''} met onbekende teams.`
+            : 'Alle knockout-teams zijn ingevuld.'}
+          {' '}Voorspellingen blijven ongewijzigd.
+        </p>
+      </div>
+
+      {msg && <p className="text-sm text-wk-gold">{msg}</p>}
+
+      <div className="space-y-4 max-h-[28rem] overflow-y-auto">
+        {Object.entries(byRound).map(([round, roundMatches]) => (
+          <div key={round}>
+            <h4 className="text-xs font-bold text-wk-gold uppercase tracking-wide mb-2">{round}</h4>
+            <div className="space-y-2">
+              {roundMatches.map((match) => (
+                <KnockoutTeamRow
+                  key={match.id}
+                  match={match}
+                  saving={savingId === match.id}
+                  onSave={handleSave}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function KnockoutTeamRow({
+  match,
+  saving,
+  onSave,
+}: {
+  match: Match;
+  saving: boolean;
+  onSave: (match: Match, homeTeam: string, awayTeam: string) => void;
+}) {
+  // Begin met het echte team als dat al is ingevuld, anders leeg (placeholder als hint).
+  const [home, setHome] = useState(isPlaceholder(match.homeTeam) ? '' : match.homeTeam);
+  const [away, setAway] = useState(isPlaceholder(match.awayTeam) ? '' : match.awayTeam);
+
+  const homePlaceholder = isPlaceholder(match.homeTeam) ? match.homeTeam : '';
+  const awayPlaceholder = isPlaceholder(match.awayTeam) ? match.awayTeam : '';
+  const changed = home !== (isPlaceholder(match.homeTeam) ? '' : match.homeTeam)
+    || away !== (isPlaceholder(match.awayTeam) ? '' : match.awayTeam);
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="text-xs text-gray-500 w-8 shrink-0">#{match.matchNum}</span>
+      <select
+        value={home}
+        onChange={(e) => setHome(e.target.value)}
+        className="flex-1 min-w-0 bg-wk-darker border border-gray-600 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-wk-orange"
+      >
+        <option value="">{homePlaceholder || '— kies thuisteam —'}</option>
+        {ALL_TEAMS.map((t) => (
+          <option key={t} value={t}>{t}</option>
+        ))}
+      </select>
+      <span className="text-gray-500 text-sm">-</span>
+      <select
+        value={away}
+        onChange={(e) => setAway(e.target.value)}
+        className="flex-1 min-w-0 bg-wk-darker border border-gray-600 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-wk-orange"
+      >
+        <option value="">{awayPlaceholder || '— kies uitteam —'}</option>
+        {ALL_TEAMS.map((t) => (
+          <option key={t} value={t}>{t}</option>
+        ))}
+      </select>
+      <button
+        onClick={() => onSave(match, home, away)}
+        disabled={saving || !home || !away || !changed}
+        className="bg-wk-green hover:bg-wk-green-light text-white text-sm px-3 py-1.5 rounded shrink-0 disabled:opacity-40"
+      >
+        {saving ? '...' : 'Opslaan'}
+      </button>
     </div>
   );
 }
