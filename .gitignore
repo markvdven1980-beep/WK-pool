@@ -7,6 +7,9 @@ dist/
 .env.*
 !.env.example
 
+# Privé Claude-context (URL's, wachtwoorden) — niet delen
+CLAUDE.local.md
+
 # Lokale database
 *.db
 *.db-journal
