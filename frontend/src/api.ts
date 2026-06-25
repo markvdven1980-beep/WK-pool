@@ -68,6 +68,8 @@ export const api = {
       }),
     sync: () =>
       request<SyncResult>('/admin/sync', { method: 'POST' }),
+    getBonus: () =>
+      request<{ questions: BonusQuestion[]; officialAnswers: { question: string; answer: string }[] }>('/admin/bonus'),
     setBonusAnswer: (question: string, answer: string) =>
       request<{ question: string; answer: string; predictionsUpdated: number }>('/admin/bonus', {
         method: 'PUT',

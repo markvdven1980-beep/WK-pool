@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
 import type { Match, SyncResult, BonusQuestion, AdminUser, AdminPool } from '../api';
-import { getFlag, ALL_TEAMS } from '../teams';
+import { getFlag, ALL_TEAMS, GROUPS } from '../teams';
 import BonusInput from '../components/BonusInput';
 
 export default function AdminPage() {
@@ -252,23 +252,20 @@ function AdminBonusPanel() {
   const [msg, setMsg] = useState('');
 
   useEffect(() => {
-    api.pools.list().then((pools) => {
-      if (pools.length > 0) {
-        api.bonus.get(pools[0].id).then((d) => {
-          setQuestions(d.questions);
-          const map: Record<string, string> = {};
-          d.officialAnswers.forEach((a) => { map[a.question] = a.answer; });
-          setAnswers(map);
-        });
-      }
+    // Los van poules: de admin kan de officiële antwoorden altijd invullen.
+    api.admin.getBonus().then((d) => {
+      setQuestions(d.questions);
+      const map: Record<string, string> = {};
+      d.officialAnswers.forEach((a) => { map[a.question] = a.answer; });
+      setAnswers(map);
     });
   }, []);
 
   const handleSave = async (question: string) => {
     if (!answers[question]?.trim()) return;
     const result = await api.admin.setBonusAnswer(question, answers[question].trim());
-    setMsg(`Antwoord opgeslagen — ${result.predictionsUpdated} voorspelling(en) beoordeeld.`);
-    setTimeout(() => setMsg(''), 3000);
+    setMsg(`Antwoord opgeslagen — ${result.predictionsUpdated} voorspelling(en) beoordeeld en punten toegekend.`);
+    setTimeout(() => setMsg(''), 4000);
   };
 
   if (questions.length === 0) return null;
@@ -342,6 +339,15 @@ function FixTimesButton() {
 // Een team is nog niet bekend zolang het een placeholder is (geen echt land).
 function isPlaceholder(team: string): boolean {
   return !ALL_TEAMS.includes(team);
+}
+
+// Welke landen kunnen in dit knockout-slot terechtkomen?
+// "Winnaar A" / "Nr. 2 A" → alleen landen uit poule A. Beste nummers 3, latere
+// rondes en al ingevulde teams → alle landen (kunnen overal vandaan komen).
+function teamOptionsFor(placeholder: string): string[] {
+  const m = placeholder.match(/^(?:Winnaar|Nr\. 2) ([A-L])$/);
+  if (m && GROUPS[m[1]]) return GROUPS[m[1]];
+  return ALL_TEAMS;
 }
 
 function KnockoutTeamsPanel() {
@@ -430,6 +436,10 @@ function KnockoutTeamRow({
   const changed = home !== (isPlaceholder(match.homeTeam) ? '' : match.homeTeam)
     || away !== (isPlaceholder(match.awayTeam) ? '' : match.awayTeam);
 
+  // Beperk de keuze tot de landen die in dit slot terecht kunnen komen.
+  const homeOptions = teamOptionsFor(match.homeTeam);
+  const awayOptions = teamOptionsFor(match.awayTeam);
+
   return (
     <div className="flex items-center gap-2 flex-wrap">
       <span className="text-xs text-gray-500 w-8 shrink-0">#{match.matchNum}</span>
@@ -439,8 +449,8 @@ function KnockoutTeamRow({
         className="flex-1 min-w-0 bg-wk-darker border border-gray-600 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-wk-orange"
       >
         <option value="">{homePlaceholder || '— kies thuisteam —'}</option>
-        {ALL_TEAMS.map((t) => (
-          <option key={t} value={t}>{t}</option>
+        {homeOptions.map((t) => (
+          <option key={t} value={t}>{getFlag(t)} {t}</option>
         ))}
       </select>
       <span className="text-gray-500 text-sm">-</span>
@@ -450,8 +460,8 @@ function KnockoutTeamRow({
         className="flex-1 min-w-0 bg-wk-darker border border-gray-600 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-wk-orange"
       >
         <option value="">{awayPlaceholder || '— kies uitteam —'}</option>
-        {ALL_TEAMS.map((t) => (
-          <option key={t} value={t}>{t}</option>
+        {awayOptions.map((t) => (
+          <option key={t} value={t}>{getFlag(t)} {t}</option>
         ))}
       </select>
       <button

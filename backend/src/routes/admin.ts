@@ -335,6 +335,17 @@ adminRouter.delete('/pools/:id', async (req: AuthRequest, res: Response) => {
   res.json({ deleted: pool.name });
 });
 
+// Haal de bonusvragen + huidige officiële antwoorden op (los van poules), zodat
+// de admin ze kan beoordelen ook zonder lid van een poule te zijn.
+adminRouter.get('/bonus', async (req: AuthRequest, res: Response) => {
+  if (!(await requireAdmin(req, res))) return;
+  const officialAnswers = await prisma.bonusAnswer.findMany();
+  res.json({
+    questions: BONUS_QUESTIONS,
+    officialAnswers: officialAnswers.map((a) => ({ question: a.question, answer: a.answer })),
+  });
+});
+
 // Stel het officiële antwoord op een bonusvraag in en ken punten toe.
 adminRouter.put('/bonus', async (req: AuthRequest, res: Response) => {
   if (!(await requireAdmin(req, res))) return;
