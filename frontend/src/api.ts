@@ -85,6 +85,8 @@ export const api = {
       request<{ deleted: string }>(`/admin/pools/${poolId}`, { method: 'DELETE' }),
     fixMatchTimes: () =>
       request<{ ok: boolean; updated: number; message: string }>('/admin/fix-match-times', { method: 'POST' }),
+    fixKnockoutSchedule: () =>
+      request<{ ok: boolean; updated: number; message: string }>('/admin/fix-knockout-schedule', { method: 'POST' }),
     syncPredictions: () =>
       request<{ ok: boolean; created: number; matchesRecalculated: number; message: string }>('/admin/sync-predictions', { method: 'POST' }),
   },

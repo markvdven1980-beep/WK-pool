@@ -103,38 +103,39 @@ const matches = [
   { matchNum: 71, homeTeam: 'Panama',   awayTeam: 'Engeland',matchDate: '2026-06-27T21:00:00Z', stadium: 'MetLife Stadium',     city: 'New Jersey',  round: 'Groepsfase', group: 'L' }, // 5 PM ET = 23:00 CEST
   { matchNum: 72, homeTeam: 'Kroatië',  awayTeam: 'Ghana',   matchDate: '2026-06-27T21:00:00Z', stadium: 'Lincoln Financial Field', city: 'Philadelphia', round: 'Groepsfase', group: 'L' }, // 5 PM ET = 23:00 CEST
 
-  // === ZESTIENDE FINALES (16 wedstrijden) ===
-  { matchNum: 73,  homeTeam: 'Winnaar A',    awayTeam: 'Nr. 2 B',      matchDate: '2026-06-28T21:00:00Z', stadium: 'MetLife Stadium',    city: 'New Jersey',   round: 'Zestiende finale', group: null },
-  { matchNum: 74,  homeTeam: 'Winnaar B',    awayTeam: 'Nr. 2 A',      matchDate: '2026-06-28T18:00:00Z', stadium: 'AT&T Stadium',       city: 'Dallas',       round: 'Zestiende finale', group: null },
-  { matchNum: 75,  homeTeam: 'Winnaar C',    awayTeam: 'Nr. 2 D',      matchDate: '2026-06-29T21:00:00Z', stadium: 'SoFi Stadium',       city: 'Los Angeles',  round: 'Zestiende finale', group: null },
-  { matchNum: 76,  homeTeam: 'Winnaar D',    awayTeam: 'Nr. 2 C',      matchDate: '2026-06-29T18:00:00Z', stadium: 'Hard Rock Stadium',  city: 'Miami',        round: 'Zestiende finale', group: null },
-  { matchNum: 77,  homeTeam: 'Winnaar E',    awayTeam: 'Nr. 2 F',      matchDate: '2026-06-30T21:00:00Z', stadium: 'NRG Stadium',        city: 'Houston',      round: 'Zestiende finale', group: null },
-  { matchNum: 78,  homeTeam: 'Winnaar F',    awayTeam: 'Nr. 2 E',      matchDate: '2026-06-30T18:00:00Z', stadium: 'Gillette Stadium',   city: 'Boston',       round: 'Zestiende finale', group: null },
-  { matchNum: 79,  homeTeam: 'Winnaar G',    awayTeam: 'Nr. 2 H',      matchDate: '2026-07-01T21:00:00Z', stadium: 'Lumen Field',        city: 'Seattle',      round: 'Zestiende finale', group: null },
-  { matchNum: 80,  homeTeam: 'Winnaar H',    awayTeam: 'Nr. 2 G',      matchDate: '2026-07-01T18:00:00Z', stadium: 'Mercedes-Benz Stadium', city: 'Atlanta',  round: 'Zestiende finale', group: null },
-  { matchNum: 81,  homeTeam: 'Winnaar I',    awayTeam: 'Nr. 2 J',      matchDate: '2026-07-02T21:00:00Z', stadium: 'MetLife Stadium',    city: 'New Jersey',   round: 'Zestiende finale', group: null },
-  { matchNum: 82,  homeTeam: 'Winnaar J',    awayTeam: 'Nr. 2 I',      matchDate: '2026-07-02T18:00:00Z', stadium: 'AT&T Stadium',       city: 'Dallas',       round: 'Zestiende finale', group: null },
-  { matchNum: 83,  homeTeam: 'Winnaar K',    awayTeam: 'Nr. 2 L',      matchDate: '2026-07-03T21:00:00Z', stadium: 'SoFi Stadium',       city: 'Los Angeles',  round: 'Zestiende finale', group: null },
-  { matchNum: 84,  homeTeam: 'Winnaar L',    awayTeam: 'Nr. 2 K',      matchDate: '2026-07-03T18:00:00Z', stadium: 'Hard Rock Stadium',  city: 'Miami',        round: 'Zestiende finale', group: null },
-  { matchNum: 85,  homeTeam: 'Nr. 3 Beste 1',awayTeam: 'Nr. 3 Beste 2',matchDate: '2026-07-04T21:00:00Z', stadium: 'NRG Stadium',        city: 'Houston',      round: 'Zestiende finale', group: null },
-  { matchNum: 86,  homeTeam: 'Nr. 3 Beste 3',awayTeam: 'Nr. 3 Beste 4',matchDate: '2026-07-04T18:00:00Z', stadium: 'Gillette Stadium',   city: 'Boston',       round: 'Zestiende finale', group: null },
-  { matchNum: 87,  homeTeam: 'Nr. 3 Beste 5',awayTeam: 'Nr. 3 Beste 6',matchDate: '2026-07-05T21:00:00Z', stadium: 'Lumen Field',        city: 'Seattle',      round: 'Zestiende finale', group: null },
-  { matchNum: 88,  homeTeam: 'Nr. 3 Beste 7',awayTeam: 'Nr. 3 Beste 8',matchDate: '2026-07-05T18:00:00Z', stadium: 'Mercedes-Benz Stadium', city: 'Atlanta',  round: 'Zestiende finale', group: null },
+  // === ZESTIENDE FINALES (16 wedstrijden) — officieel FIFA-schema (Round of 32) ===
+  // 4 groepswinnaars vs nummers 2, 8 groepswinnaars vs beste nummers 3, 4 paren nummers 2 onderling.
+  { matchNum: 73, homeTeam: 'Nr. 2 A',    awayTeam: 'Nr. 2 B',          matchDate: '2026-06-28T19:00:00Z', stadium: 'SoFi Stadium',          city: 'Los Angeles', round: 'Zestiende finale', group: null },
+  { matchNum: 74, homeTeam: 'Winnaar E',  awayTeam: 'Nr. 3 A/B/C/D/F',  matchDate: '2026-06-29T20:30:00Z', stadium: 'Gillette Stadium',      city: 'Boston',      round: 'Zestiende finale', group: null },
+  { matchNum: 75, homeTeam: 'Winnaar F',  awayTeam: 'Nr. 2 C',          matchDate: '2026-06-29T23:00:00Z', stadium: 'Estadio BBVA',          city: 'Monterrey',   round: 'Zestiende finale', group: null },
+  { matchNum: 76, homeTeam: 'Winnaar C',  awayTeam: 'Nr. 2 F',          matchDate: '2026-06-29T16:00:00Z', stadium: 'NRG Stadium',           city: 'Houston',     round: 'Zestiende finale', group: null },
+  { matchNum: 77, homeTeam: 'Winnaar I',  awayTeam: 'Nr. 3 C/D/F/G/H',  matchDate: '2026-06-30T21:00:00Z', stadium: 'MetLife Stadium',       city: 'New Jersey',  round: 'Zestiende finale', group: null },
+  { matchNum: 78, homeTeam: 'Nr. 2 E',    awayTeam: 'Nr. 2 I',          matchDate: '2026-06-30T17:00:00Z', stadium: 'AT&T Stadium',          city: 'Dallas',      round: 'Zestiende finale', group: null },
+  { matchNum: 79, homeTeam: 'Winnaar A',  awayTeam: 'Nr. 3 C/E/F/H/I',  matchDate: '2026-06-30T23:00:00Z', stadium: 'Estadio Azteca',        city: 'Mexico-Stad', round: 'Zestiende finale', group: null },
+  { matchNum: 80, homeTeam: 'Winnaar L',  awayTeam: 'Nr. 3 E/H/I/J/K',  matchDate: '2026-07-01T16:00:00Z', stadium: 'Mercedes-Benz Stadium', city: 'Atlanta',     round: 'Zestiende finale', group: null },
+  { matchNum: 81, homeTeam: 'Winnaar D',  awayTeam: 'Nr. 3 B/E/F/I/J',  matchDate: '2026-07-01T20:00:00Z', stadium: "Levi's Stadium",        city: 'San Francisco', round: 'Zestiende finale', group: null },
+  { matchNum: 82, homeTeam: 'Winnaar G',  awayTeam: 'Nr. 3 A/H/I/J',    matchDate: '2026-07-01T20:00:00Z', stadium: 'Lumen Field',           city: 'Seattle',     round: 'Zestiende finale', group: null },
+  { matchNum: 83, homeTeam: 'Nr. 2 K',    awayTeam: 'Nr. 2 L',          matchDate: '2026-07-02T23:00:00Z', stadium: 'BMO Field',             city: 'Toronto',     round: 'Zestiende finale', group: null },
+  { matchNum: 84, homeTeam: 'Winnaar H',  awayTeam: 'Nr. 2 J',          matchDate: '2026-07-02T19:00:00Z', stadium: 'SoFi Stadium',          city: 'Los Angeles', round: 'Zestiende finale', group: null },
+  { matchNum: 85, homeTeam: 'Winnaar B',  awayTeam: 'Nr. 3 E/F/G/I/J',  matchDate: '2026-07-02T23:00:00Z', stadium: 'BC Place',              city: 'Vancouver',   round: 'Zestiende finale', group: null },
+  { matchNum: 86, homeTeam: 'Winnaar J',  awayTeam: 'Nr. 2 H',          matchDate: '2026-07-03T22:00:00Z', stadium: 'Hard Rock Stadium',     city: 'Miami',       round: 'Zestiende finale', group: null },
+  { matchNum: 87, homeTeam: 'Winnaar K',  awayTeam: 'Nr. 3 D/E/I/J/L',  matchDate: '2026-07-03T23:30:00Z', stadium: 'Arrowhead Stadium',     city: 'Kansas City', round: 'Zestiende finale', group: null },
+  { matchNum: 88, homeTeam: 'Nr. 2 D',    awayTeam: 'Nr. 2 G',          matchDate: '2026-07-03T18:00:00Z', stadium: 'AT&T Stadium',          city: 'Dallas',      round: 'Zestiende finale', group: null },
 
-  // === ACHTSTE FINALES (8 wedstrijden) ===
-  { matchNum: 89, homeTeam: 'Winnaar W73', awayTeam: 'Winnaar W74', matchDate: '2026-07-06T21:00:00Z', stadium: 'MetLife Stadium',    city: 'New Jersey',  round: 'Achtste finale', group: null },
-  { matchNum: 90, homeTeam: 'Winnaar W75', awayTeam: 'Winnaar W76', matchDate: '2026-07-06T18:00:00Z', stadium: 'AT&T Stadium',       city: 'Dallas',      round: 'Achtste finale', group: null },
-  { matchNum: 91, homeTeam: 'Winnaar W77', awayTeam: 'Winnaar W78', matchDate: '2026-07-07T21:00:00Z', stadium: 'SoFi Stadium',       city: 'Los Angeles', round: 'Achtste finale', group: null },
+  // === ACHTSTE FINALES (8 wedstrijden) — officiële bracket-koppelingen ===
+  { matchNum: 89, homeTeam: 'Winnaar W74', awayTeam: 'Winnaar W77', matchDate: '2026-07-06T21:00:00Z', stadium: 'MetLife Stadium',    city: 'New Jersey',  round: 'Achtste finale', group: null },
+  { matchNum: 90, homeTeam: 'Winnaar W73', awayTeam: 'Winnaar W75', matchDate: '2026-07-06T18:00:00Z', stadium: 'AT&T Stadium',       city: 'Dallas',      round: 'Achtste finale', group: null },
+  { matchNum: 91, homeTeam: 'Winnaar W76', awayTeam: 'Winnaar W78', matchDate: '2026-07-07T21:00:00Z', stadium: 'SoFi Stadium',       city: 'Los Angeles', round: 'Achtste finale', group: null },
   { matchNum: 92, homeTeam: 'Winnaar W79', awayTeam: 'Winnaar W80', matchDate: '2026-07-07T18:00:00Z', stadium: 'Hard Rock Stadium',  city: 'Miami',       round: 'Achtste finale', group: null },
-  { matchNum: 93, homeTeam: 'Winnaar W81', awayTeam: 'Winnaar W82', matchDate: '2026-07-08T21:00:00Z', stadium: 'NRG Stadium',        city: 'Houston',     round: 'Achtste finale', group: null },
-  { matchNum: 94, homeTeam: 'Winnaar W83', awayTeam: 'Winnaar W84', matchDate: '2026-07-08T18:00:00Z', stadium: 'Gillette Stadium',   city: 'Boston',      round: 'Achtste finale', group: null },
-  { matchNum: 95, homeTeam: 'Winnaar W85', awayTeam: 'Winnaar W86', matchDate: '2026-07-09T21:00:00Z', stadium: 'Lumen Field',        city: 'Seattle',     round: 'Achtste finale', group: null },
-  { matchNum: 96, homeTeam: 'Winnaar W87', awayTeam: 'Winnaar W88', matchDate: '2026-07-09T18:00:00Z', stadium: 'Mercedes-Benz Stadium', city: 'Atlanta', round: 'Achtste finale', group: null },
+  { matchNum: 93, homeTeam: 'Winnaar W83', awayTeam: 'Winnaar W84', matchDate: '2026-07-08T21:00:00Z', stadium: 'NRG Stadium',        city: 'Houston',     round: 'Achtste finale', group: null },
+  { matchNum: 94, homeTeam: 'Winnaar W81', awayTeam: 'Winnaar W82', matchDate: '2026-07-08T18:00:00Z', stadium: 'Gillette Stadium',   city: 'Boston',      round: 'Achtste finale', group: null },
+  { matchNum: 95, homeTeam: 'Winnaar W86', awayTeam: 'Winnaar W88', matchDate: '2026-07-09T21:00:00Z', stadium: 'Lumen Field',        city: 'Seattle',     round: 'Achtste finale', group: null },
+  { matchNum: 96, homeTeam: 'Winnaar W85', awayTeam: 'Winnaar W87', matchDate: '2026-07-09T18:00:00Z', stadium: 'Mercedes-Benz Stadium', city: 'Atlanta', round: 'Achtste finale', group: null },
 
-  // === KWARTFINALES (4 wedstrijden) ===
+  // === KWARTFINALES (4 wedstrijden) — officiële bracket-koppelingen ===
   { matchNum: 97,  homeTeam: 'Winnaar W89', awayTeam: 'Winnaar W90', matchDate: '2026-07-11T21:00:00Z', stadium: 'MetLife Stadium',   city: 'New Jersey',  round: 'Kwartfinale', group: null },
-  { matchNum: 98,  homeTeam: 'Winnaar W91', awayTeam: 'Winnaar W92', matchDate: '2026-07-11T18:00:00Z', stadium: 'AT&T Stadium',      city: 'Dallas',      round: 'Kwartfinale', group: null },
-  { matchNum: 99,  homeTeam: 'Winnaar W93', awayTeam: 'Winnaar W94', matchDate: '2026-07-12T21:00:00Z', stadium: 'SoFi Stadium',      city: 'Los Angeles', round: 'Kwartfinale', group: null },
+  { matchNum: 98,  homeTeam: 'Winnaar W93', awayTeam: 'Winnaar W94', matchDate: '2026-07-11T18:00:00Z', stadium: 'AT&T Stadium',      city: 'Dallas',      round: 'Kwartfinale', group: null },
+  { matchNum: 99,  homeTeam: 'Winnaar W91', awayTeam: 'Winnaar W92', matchDate: '2026-07-12T21:00:00Z', stadium: 'SoFi Stadium',      city: 'Los Angeles', round: 'Kwartfinale', group: null },
   { matchNum: 100, homeTeam: 'Winnaar W95', awayTeam: 'Winnaar W96', matchDate: '2026-07-12T18:00:00Z', stadium: 'Hard Rock Stadium', city: 'Miami',       round: 'Kwartfinale', group: null },
 
   // === HALVE FINALES (2 wedstrijden) ===

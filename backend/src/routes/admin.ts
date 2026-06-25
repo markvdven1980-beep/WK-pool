@@ -3,11 +3,18 @@ import { PrismaClient } from '@prisma/client';
 import { authMiddleware, AuthRequest } from '../middleware';
 import { recalcMatchPredictions } from '../services/recalc';
 import { syncResults } from '../services/resultsSync';
-import { BONUS_QUESTIONS, pointsForQuestion, answersMatch } from '../services/bonus';
+import { BONUS_QUESTIONS, pointsForQuestion, answersMatch, OFFICIAL_GROUPS } from '../services/bonus';
 import { generatePassword, hashPassword } from '../services/password';
 
 const prisma = new PrismaClient();
 export const adminRouter = Router();
+
+// Echte landen (uit de officiële groepen). Knockout-slots met een ander label
+// ("Winnaar A", "Nr. 2 B", "Winnaar W74") zijn placeholders.
+const REAL_TEAMS_SET = new Set(Object.values(OFFICIAL_GROUPS).flat());
+function isPlaceholderTeam(team: string): boolean {
+  return !REAL_TEAMS_SET.has(team);
+}
 
 adminRouter.use(authMiddleware);
 
@@ -210,6 +217,87 @@ adminRouter.post('/fix-match-times', async (req: AuthRequest, res: Response) => 
     ok: true,
     updated,
     message: `${updated} wedstrijdtijden bijgewerkt naar officiële UTC-tijden. Voorspellingen zijn niet gewijzigd.`,
+  });
+});
+
+// Corrigeer het knockout-schema naar het officiële FIFA-bracket (Round of 32 t/m
+// kwartfinales). Vervangt alleen placeholders — al ingevulde echte teams blijven
+// staan. Raakt voorspellingen niet aan (die hangen aan de wedstrijd, niet de teams).
+adminRouter.post('/fix-knockout-schedule', async (req: AuthRequest, res: Response) => {
+  if (!(await requireAdmin(req, res))) return;
+
+  // Zestiende finales: volledige correctie (teams + datum + locatie).
+  const r32: Record<number, { home: string; away: string; date: string; stadium: string; city: string }> = {
+    73: { home: 'Nr. 2 A',   away: 'Nr. 2 B',         date: '2026-06-28T19:00:00Z', stadium: 'SoFi Stadium',          city: 'Los Angeles' },
+    74: { home: 'Winnaar E', away: 'Nr. 3 A/B/C/D/F', date: '2026-06-29T20:30:00Z', stadium: 'Gillette Stadium',      city: 'Boston' },
+    75: { home: 'Winnaar F', away: 'Nr. 2 C',         date: '2026-06-29T23:00:00Z', stadium: 'Estadio BBVA',          city: 'Monterrey' },
+    76: { home: 'Winnaar C', away: 'Nr. 2 F',         date: '2026-06-29T16:00:00Z', stadium: 'NRG Stadium',           city: 'Houston' },
+    77: { home: 'Winnaar I', away: 'Nr. 3 C/D/F/G/H', date: '2026-06-30T21:00:00Z', stadium: 'MetLife Stadium',       city: 'New Jersey' },
+    78: { home: 'Nr. 2 E',   away: 'Nr. 2 I',         date: '2026-06-30T17:00:00Z', stadium: 'AT&T Stadium',          city: 'Dallas' },
+    79: { home: 'Winnaar A', away: 'Nr. 3 C/E/F/H/I', date: '2026-06-30T23:00:00Z', stadium: 'Estadio Azteca',        city: 'Mexico-Stad' },
+    80: { home: 'Winnaar L', away: 'Nr. 3 E/H/I/J/K', date: '2026-07-01T16:00:00Z', stadium: 'Mercedes-Benz Stadium', city: 'Atlanta' },
+    81: { home: 'Winnaar D', away: 'Nr. 3 B/E/F/I/J', date: '2026-07-01T20:00:00Z', stadium: "Levi's Stadium",        city: 'San Francisco' },
+    82: { home: 'Winnaar G', away: 'Nr. 3 A/H/I/J',   date: '2026-07-01T20:00:00Z', stadium: 'Lumen Field',           city: 'Seattle' },
+    83: { home: 'Nr. 2 K',   away: 'Nr. 2 L',         date: '2026-07-02T23:00:00Z', stadium: 'BMO Field',             city: 'Toronto' },
+    84: { home: 'Winnaar H', away: 'Nr. 2 J',         date: '2026-07-02T19:00:00Z', stadium: 'SoFi Stadium',          city: 'Los Angeles' },
+    85: { home: 'Winnaar B', away: 'Nr. 3 E/F/G/I/J', date: '2026-07-02T23:00:00Z', stadium: 'BC Place',              city: 'Vancouver' },
+    86: { home: 'Winnaar J', away: 'Nr. 2 H',         date: '2026-07-03T22:00:00Z', stadium: 'Hard Rock Stadium',     city: 'Miami' },
+    87: { home: 'Winnaar K', away: 'Nr. 3 D/E/I/J/L', date: '2026-07-03T23:30:00Z', stadium: 'Arrowhead Stadium',     city: 'Kansas City' },
+    88: { home: 'Nr. 2 D',   away: 'Nr. 2 G',         date: '2026-07-03T18:00:00Z', stadium: 'AT&T Stadium',          city: 'Dallas' },
+  };
+
+  // Achtste finales en kwartfinales: alleen de bracket-koppelingen (W-verwijzingen).
+  const links: Record<number, { home: string; away: string }> = {
+    89: { home: 'Winnaar W74', away: 'Winnaar W77' },
+    90: { home: 'Winnaar W73', away: 'Winnaar W75' },
+    91: { home: 'Winnaar W76', away: 'Winnaar W78' },
+    92: { home: 'Winnaar W79', away: 'Winnaar W80' },
+    93: { home: 'Winnaar W83', away: 'Winnaar W84' },
+    94: { home: 'Winnaar W81', away: 'Winnaar W82' },
+    95: { home: 'Winnaar W86', away: 'Winnaar W88' },
+    96: { home: 'Winnaar W85', away: 'Winnaar W87' },
+    98: { home: 'Winnaar W93', away: 'Winnaar W94' },
+    99: { home: 'Winnaar W91', away: 'Winnaar W92' },
+  };
+
+  let updated = 0;
+
+  for (const [numStr, d] of Object.entries(r32)) {
+    const matchNum = parseInt(numStr);
+    const match = await prisma.match.findUnique({ where: { matchNum } });
+    if (!match) continue;
+    await prisma.match.update({
+      where: { matchNum },
+      data: {
+        // Echte teams (bv. al ingevuld na de poulefase) niet overschrijven.
+        homeTeam: isPlaceholderTeam(match.homeTeam) ? d.home : match.homeTeam,
+        awayTeam: isPlaceholderTeam(match.awayTeam) ? d.away : match.awayTeam,
+        matchDate: new Date(d.date),
+        stadium: d.stadium,
+        city: d.city,
+      },
+    });
+    updated++;
+  }
+
+  for (const [numStr, d] of Object.entries(links)) {
+    const matchNum = parseInt(numStr);
+    const match = await prisma.match.findUnique({ where: { matchNum } });
+    if (!match) continue;
+    await prisma.match.update({
+      where: { matchNum },
+      data: {
+        homeTeam: isPlaceholderTeam(match.homeTeam) ? d.home : match.homeTeam,
+        awayTeam: isPlaceholderTeam(match.awayTeam) ? d.away : match.awayTeam,
+      },
+    });
+    updated++;
+  }
+
+  res.json({
+    ok: true,
+    updated,
+    message: `${updated} knockout-wedstrijden bijgewerkt naar het officiële schema. Voorspellingen zijn niet gewijzigd.`,
   });
 });
 
