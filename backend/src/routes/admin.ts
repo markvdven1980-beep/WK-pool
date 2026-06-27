@@ -3,18 +3,11 @@ import { PrismaClient } from '@prisma/client';
 import { authMiddleware, AuthRequest } from '../middleware';
 import { recalcMatchPredictions } from '../services/recalc';
 import { syncResults } from '../services/resultsSync';
-import { BONUS_QUESTIONS, pointsForQuestion, answersMatch, OFFICIAL_GROUPS } from '../services/bonus';
+import { BONUS_QUESTIONS, pointsForQuestion, answersMatch } from '../services/bonus';
 import { generatePassword, hashPassword } from '../services/password';
 
 const prisma = new PrismaClient();
 export const adminRouter = Router();
-
-// Echte landen (uit de officiële groepen). Knockout-slots met een ander label
-// ("Winnaar A", "Nr. 2 B", "Winnaar W74") zijn placeholders.
-const REAL_TEAMS_SET = new Set(Object.values(OFFICIAL_GROUPS).flat());
-function isPlaceholderTeam(team: string): boolean {
-  return !REAL_TEAMS_SET.has(team);
-}
 
 adminRouter.use(authMiddleware);
 
@@ -269,9 +262,10 @@ adminRouter.post('/fix-knockout-schedule', async (req: AuthRequest, res: Respons
     await prisma.match.update({
       where: { matchNum },
       data: {
-        // Echte teams (bv. al ingevuld na de poulefase) niet overschrijven.
-        homeTeam: isPlaceholderTeam(match.homeTeam) ? d.home : match.homeTeam,
-        awayTeam: isPlaceholderTeam(match.awayTeam) ? d.away : match.awayTeam,
+        // Forceer de officiële placeholders: zo worden ook verkeerd ingevulde
+        // teams (bv. via een eerdere foutieve sync) teruggezet naar het schema.
+        homeTeam: d.home,
+        awayTeam: d.away,
         matchDate: new Date(d.date),
         stadium: d.stadium,
         city: d.city,
@@ -286,10 +280,7 @@ adminRouter.post('/fix-knockout-schedule', async (req: AuthRequest, res: Respons
     if (!match) continue;
     await prisma.match.update({
       where: { matchNum },
-      data: {
-        homeTeam: isPlaceholderTeam(match.homeTeam) ? d.home : match.homeTeam,
-        awayTeam: isPlaceholderTeam(match.awayTeam) ? d.away : match.awayTeam,
-      },
+      data: { homeTeam: d.home, awayTeam: d.away },
     });
     updated++;
   }
@@ -297,7 +288,7 @@ adminRouter.post('/fix-knockout-schedule', async (req: AuthRequest, res: Respons
   res.json({
     ok: true,
     updated,
-    message: `${updated} knockout-wedstrijden bijgewerkt naar het officiële schema. Voorspellingen zijn niet gewijzigd.`,
+    message: `${updated} knockout-wedstrijden teruggezet naar het officiële schema. Voorspellingen zijn niet gewijzigd.`,
   });
 });
 

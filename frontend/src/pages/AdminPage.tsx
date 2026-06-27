@@ -84,16 +84,6 @@ export default function AdminPage() {
                 ))}
               </ul>
             )}
-            {syncMsg.teamsFilled && syncMsg.teamsFilled.length > 0 && (
-              <div className="mt-2">
-                <p className="text-xs text-wk-gold">Automatisch ingevulde knockout-teams (controleer ze):</p>
-                <ul className="mt-1 text-xs text-gray-400">
-                  {syncMsg.teamsFilled.map((m) => (
-                    <li key={m.matchNum}>#{m.matchNum} {m.homeTeam} - {m.awayTeam}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -481,7 +471,7 @@ function FixKnockoutButton() {
   const [result, setResult] = useState<string>('');
 
   const handleFix = async () => {
-    if (!confirm('Knockout-schema corrigeren naar het officiële FIFA-bracket?\n\nAlleen placeholders worden vervangen; al ingevulde teams en voorspellingen blijven ongewijzigd.')) return;
+    if (!confirm('Knockout-schema terugzetten naar het officiële FIFA-bracket?\n\nLet op: alle knockout-wedstrijden (zestiende finales t/m kwartfinales) worden teruggezet naar placeholders volgens het officiële schema. Eventueel handmatig ingevulde teams worden gewist. Voorspellingen blijven ongewijzigd.')) return;
     setLoading(true);
     try {
       const r = await api.admin.fixKnockoutSchedule();

@@ -154,7 +154,6 @@ export interface SyncResult {
   message: string;
   updatedMatches: { matchNum: number; homeTeam: string; awayTeam: string; score: string }[];
   unmatched?: string[];
-  teamsFilled?: { matchNum: number; homeTeam: string; awayTeam: string }[];
 }
 
 export interface User {
