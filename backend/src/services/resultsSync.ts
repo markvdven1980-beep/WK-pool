@@ -191,6 +191,16 @@ export async function syncResults(prisma: PrismaClient): Promise<SyncResult> {
     );
     if (!target) continue;
 
+    // Datumcontrole: het teampaar moet ook rond dezelfde datum spelen. Zo wordt
+    // een gelijknamige wedstrijd uit een ander toernooi of een oefenwedstrijd
+    // (zelfde landen, andere datum) niet per ongeluk overgenomen.
+    if (apiMatch.utcDate) {
+      const daysApart = Math.abs(
+        new Date(apiMatch.utcDate).getTime() - new Date(target.matchDate).getTime()
+      ) / (1000 * 60 * 60 * 24);
+      if (daysApart > 2) continue;
+    }
+
     // Bepaal of teams omgedraaid zijn t.o.v. onze opstelling.
     const flipped = target.homeTeam === away && target.awayTeam === home;
     const newHome = flipped ? awayScore : homeScore;
