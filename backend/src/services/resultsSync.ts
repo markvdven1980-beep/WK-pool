@@ -157,9 +157,27 @@ export async function syncResults(prisma: PrismaClient): Promise<SyncResult> {
     const awayRaw = apiMatch.awayTeam?.name;
     const home = toDutch(homeRaw);
     const away = toDutch(awayRaw);
-    // football-data fullTime is de stand na verlenging, exclusief strafschoppen.
-    const homeScore = apiMatch.score?.fullTime?.home;
-    const awayScore = apiMatch.score?.fullTime?.away;
+    // Bepaal de eindstand exclusief strafschoppen. Een wedstrijd die op
+    // strafschoppen wordt beslist eindigt altijd gelijk (bv. 1-1); de poule
+    // scoort op die stand, niet op de penaltyreeks.
+    const sc = apiMatch.score || {};
+    let homeScore = sc.fullTime?.home;
+    let awayScore = sc.fullTime?.away;
+    const pens = sc.penalties;
+    const wentToPenalties =
+      sc.duration === 'PENALTY_SHOOTOUT' || (pens && pens.home != null && pens.away != null);
+    if (wentToPenalties && homeScore != null && awayScore != null && homeScore !== awayScore) {
+      // fullTime is ongelijk terwijl de wedstrijd op strafschoppen ging → de
+      // penaltyreeks zit erin verwerkt. Trek 'm eraf om de gelijke eindstand
+      // terug te krijgen (valt terug op de reguliere tijd als die er is).
+      if (sc.regularTime?.home != null && sc.regularTime.home === sc.regularTime.away) {
+        homeScore = sc.regularTime.home;
+        awayScore = sc.regularTime.away;
+      } else if (pens && pens.home != null && pens.away != null) {
+        homeScore = sc.fullTime.home - pens.home;
+        awayScore = sc.fullTime.away - pens.away;
+      }
+    }
 
     // Noteer onherkende landnamen van afgeronde wedstrijden voor diagnose.
     if (homeRaw && !home) unmatchedSet.add(homeRaw);
