@@ -58,6 +58,39 @@ adminRouter.post('/sync', async (req: AuthRequest, res: Response) => {
   res.json(result);
 });
 
+// Diagnose: laat zien wat football-data.org's "WC"-feed precies teruggeeft.
+adminRouter.get('/debug-feed', async (req: AuthRequest, res: Response) => {
+  if (!(await requireAdmin(req, res))) return;
+  const apiKey = process.env.FOOTBALL_DATA_API_KEY;
+  if (!apiKey) { res.json({ error: 'Geen API-key' }); return; }
+  try {
+    const r = await fetch('https://api.football-data.org/v4/competitions/WC/matches?status=FINISHED', {
+      headers: { 'X-Auth-Token': apiKey },
+    });
+    if (!r.ok) { res.json({ error: `HTTP ${r.status}` }); return; }
+    const data: any = await r.json();
+    const ms: any[] = data.matches || [];
+    const dates = ms.map((m) => m.utcDate).filter(Boolean).sort();
+    const sample = ms
+      .filter((m) => /germany|paraguay/i.test(`${m.homeTeam?.name} ${m.awayTeam?.name}`))
+      .map((m) => ({
+        utcDate: m.utcDate,
+        stage: m.stage,
+        teams: `${m.homeTeam?.name} - ${m.awayTeam?.name}`,
+        score: m.score,
+      }));
+    res.json({
+      competition: data.competition?.name,
+      season: data.competition?.season || data.season,
+      totalFinished: ms.length,
+      dateRange: dates.length ? { first: dates[0], last: dates[dates.length - 1] } : null,
+      germanyParaguayMatches: sample,
+    });
+  } catch (err: any) {
+    res.json({ error: err.message });
+  }
+});
+
 // Alle gebruikers ophalen (voor admin-overzicht).
 adminRouter.get('/users', async (req: AuthRequest, res: Response) => {
   if (!(await requireAdmin(req, res))) return;
