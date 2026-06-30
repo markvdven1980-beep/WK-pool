@@ -157,22 +157,20 @@ export async function syncResults(prisma: PrismaClient): Promise<SyncResult> {
     const awayRaw = apiMatch.awayTeam?.name;
     const home = toDutch(homeRaw);
     const away = toDutch(awayRaw);
-    // Bepaal de eindstand exclusief strafschoppen. Een wedstrijd die op
-    // strafschoppen wordt beslist eindigt na de verlenging altijd gelijk
-    // (0-0, 1-1, 2-2, ...); de poule scoort op die stand, niet op de penaltyreeks.
+    // Bepaal de eindstand exclusief strafschoppen. De poule scoort op de stand
+    // na de verlenging (bij een strafschoppenreeks altijd gelijk: 0-0, 1-1, ...).
+    // football-data's fullTime bevat bij een shootout de strafschoppen en is
+    // bovendien inconsistent; regularTime (na 90 min) + extraTime (doelpunten in
+    // de verlenging) is de betrouwbare bron.
     const sc = apiMatch.score || {};
     let homeScore = sc.fullTime?.home;
     let awayScore = sc.fullTime?.away;
-    const pens = sc.penalties;
-    if (
-      pens && pens.home != null && pens.away != null &&
-      homeScore != null && awayScore != null && homeScore !== awayScore
-    ) {
-      // De stand is ongelijk terwijl de wedstrijd op strafschoppen ging → de
-      // penaltyreeks zit in de stand verwerkt. Trek 'm eraf voor de werkelijke
-      // (gelijke) eindstand na de verlenging.
-      homeScore = homeScore - pens.home;
-      awayScore = awayScore - pens.away;
+    const wentToPenalties =
+      sc.duration === 'PENALTY_SHOOTOUT' ||
+      (sc.penalties && sc.penalties.home != null && sc.penalties.away != null);
+    if (wentToPenalties && sc.regularTime?.home != null && sc.regularTime?.away != null) {
+      homeScore = sc.regularTime.home + (sc.extraTime?.home ?? 0);
+      awayScore = sc.regularTime.away + (sc.extraTime?.away ?? 0);
     }
 
     // Noteer onherkende landnamen van afgeronde wedstrijden voor diagnose.
