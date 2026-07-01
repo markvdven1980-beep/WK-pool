@@ -446,9 +446,10 @@ adminRouter.put('/bonus', async (req: AuthRequest, res: Response) => {
   });
 
   const maxPoints = pointsForQuestion(question);
+  const questionType = BONUS_QUESTIONS.find((q) => q.key === question)?.type;
   const predictions = await prisma.bonusPrediction.findMany({ where: { question } });
   for (const pred of predictions) {
-    const correct = answersMatch(pred.answer, answer);
+    const correct = answersMatch(pred.answer, answer, questionType);
     await prisma.bonusPrediction.update({
       where: { id: pred.id },
       data: { correct, points: correct ? maxPoints : 0 },

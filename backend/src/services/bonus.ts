@@ -52,8 +52,52 @@ export function pointsForQuestion(key: string): number {
   return BONUS_QUESTIONS.find((q) => q.key === key)?.points ?? 0;
 }
 
-// Vergelijk antwoorden tolerant: hoofdletters/spaties negeren.
-export function answersMatch(a: string, b: string): boolean {
-  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
-  return norm(a) === norm(b);
+// Normaliseer voor vergelijking: kleine letters, accenten en leestekens weg.
+function normalizeAnswer(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // accenten verwijderen
+    .replace(/[^a-z0-9\s]/g, ' ') // leestekens → spatie
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Vergelijk een voorspelling met het officiële antwoord.
+ * - Voor team/groepswinnaar/getal: exacte match (na normalisatie).
+ * - Voor tekst (bv. topscorer): het officiële antwoord mag meerdere geldige
+ *   namen bevatten, gescheiden door "/", ";", "," "&" of " en " (handig bij
+ *   twee gedeelde topscorers). Een voor- óf achternaam telt ook: als de
+ *   ingevulde naam een deelverzameling is van een geldige naam (of andersom),
+ *   is het goed. Zo krijgt "Depay" punten bij het antwoord "Memphis Depay".
+ */
+export function answersMatch(prediction: string, official: string, type?: BonusInputType): boolean {
+  const predNorm = normalizeAnswer(prediction);
+  const officialNorm = normalizeAnswer(official);
+  if (!predNorm || !officialNorm) return false;
+
+  if (type && type !== 'text') {
+    return predNorm === officialNorm;
+  }
+
+  const predWords = predNorm.split(' ').filter((w) => w.length >= 2);
+  if (predWords.length === 0) return false;
+  const predSet = new Set(predWords);
+
+  const officialNames = official
+    .split(/\s*[/;,&]\s*|\s+en\s+/i)
+    .map(normalizeAnswer)
+    .filter(Boolean);
+
+  for (const name of officialNames) {
+    if (predNorm === name) return true;
+    const nameWords = name.split(' ').filter((w) => w.length >= 2);
+    if (nameWords.length === 0) continue;
+    const nameSet = new Set(nameWords);
+    const predSubsetOfName = predWords.every((w) => nameSet.has(w));
+    const nameSubsetOfPred = nameWords.every((w) => predSet.has(w));
+    if (predSubsetOfName || nameSubsetOfPred) return true;
+  }
+  return false;
 }
