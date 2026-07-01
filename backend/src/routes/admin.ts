@@ -425,6 +425,47 @@ adminRouter.get('/bonus', async (req: AuthRequest, res: Response) => {
   });
 });
 
+// Overzicht van alle antwoorden op één bonusvraag, met per deelnemer of het
+// (met de huidige matchlogica) goed gerekend wordt. Handig om vooraf te zien
+// wie punten krijgt. Geef ?answer=... mee om tegen een specifiek antwoord te
+// toetsen; anders wordt het opgeslagen officiële antwoord gebruikt.
+adminRouter.get('/bonus-predictions', async (req: AuthRequest, res: Response) => {
+  if (!(await requireAdmin(req, res))) return;
+  const question = req.query.question as string;
+  if (!question) { res.status(400).json({ error: 'question is verplicht' }); return; }
+  const q = BONUS_QUESTIONS.find((x) => x.key === question);
+  if (!q) { res.status(400).json({ error: 'Onbekende bonusvraag' }); return; }
+
+  const stored = await prisma.bonusAnswer.findUnique({ where: { question } });
+  const answer = (req.query.answer as string) ?? stored?.answer ?? '';
+
+  const preds = await prisma.bonusPrediction.findMany({
+    where: { question },
+    include: {
+      user: { select: { name: true, username: true } },
+      pool: { select: { name: true } },
+    },
+  });
+
+  const rows = preds.map((p) => ({
+    user: p.user.name,
+    username: p.user.username,
+    pool: p.pool.name,
+    answer: p.answer,
+    correct: answer ? answersMatch(p.answer, answer, q.type) : null,
+  }));
+
+  res.json({
+    question,
+    label: q.label,
+    points: q.points,
+    evaluatedAgainst: answer,
+    total: rows.length,
+    matched: rows.filter((r) => r.correct).length,
+    predictions: rows.sort((a, b) => Number(b.correct) - Number(a.correct)),
+  });
+});
+
 // Stel het officiële antwoord op een bonusvraag in en ken punten toe.
 adminRouter.put('/bonus', async (req: AuthRequest, res: Response) => {
   if (!(await requireAdmin(req, res))) return;
