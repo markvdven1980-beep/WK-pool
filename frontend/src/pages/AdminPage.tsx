@@ -333,11 +333,36 @@ function isPlaceholder(team: string): boolean {
 }
 
 // Welke landen kunnen in dit knockout-slot terechtkomen?
-// "Winnaar A" / "Nr. 2 A" → alleen landen uit poule A. Beste nummers 3, latere
-// rondes en al ingevulde teams → alle landen (kunnen overal vandaan komen).
-function teamOptionsFor(placeholder: string): string[] {
-  const m = placeholder.match(/^(?:Winnaar|Nr\. 2) ([A-L])$/);
-  if (m && GROUPS[m[1]]) return GROUPS[m[1]];
+// - Zestiende finale "Winnaar A" / "Nr. 2 A" → alleen landen uit poule A.
+// - "Nr. 3 ..." → alle landen (beste nummers 3 kunnen uit meerdere groepen komen).
+// - Latere rondes "Winnaar W74" / "Winnaar HF1" → de teams van die eerdere
+//   wedstrijd. Zijn die zelf nog placeholders, dan wordt de lijst recursief
+//   teruggerekend naar de mogelijke kandidaten (wordt korter per ingevulde ronde).
+function teamOptionsFor(placeholder: string, allMatches: Match[], depth = 0): string[] {
+  const grp = placeholder.match(/^(?:Winnaar|Nr\. 2) ([A-L])$/);
+  if (grp && GROUPS[grp[1]]) return GROUPS[grp[1]];
+
+  if (depth > 12) return ALL_TEAMS; // veiligheidsrem tegen te diepe recursie
+
+  // Verwijzing naar een eerdere wedstrijd bepalen.
+  let refNum: number | null = null;
+  const w = placeholder.match(/^Winnaar W(\d+)$/);
+  if (w) refNum = parseInt(w[1], 10);
+  const hf = placeholder.match(/^(?:Winnaar|Verliezer) HF(\d+)$/);
+  if (hf) refNum = 100 + parseInt(hf[1], 10); // HF1 = wedstrijd 101, HF2 = 102
+
+  if (refNum !== null) {
+    const prev = allMatches.find((m) => m.matchNum === refNum);
+    if (prev) {
+      // De deelnemer komt uit één van de twee slots van de vorige wedstrijd:
+      // een al ingevuld team telt als zichzelf, een placeholder wordt uitgesplitst.
+      const slotOptions = (team: string) =>
+        isPlaceholder(team) ? teamOptionsFor(team, allMatches, depth + 1) : [team];
+      const opts = new Set<string>([...slotOptions(prev.homeTeam), ...slotOptions(prev.awayTeam)]);
+      if (opts.size > 0) return [...opts];
+    }
+  }
+
   return ALL_TEAMS;
 }
 
@@ -397,6 +422,7 @@ function KnockoutTeamsPanel() {
                 <KnockoutTeamRow
                   key={match.id}
                   match={match}
+                  allMatches={matches}
                   saving={savingId === match.id}
                   onSave={handleSave}
                 />
@@ -411,10 +437,12 @@ function KnockoutTeamsPanel() {
 
 function KnockoutTeamRow({
   match,
+  allMatches,
   saving,
   onSave,
 }: {
   match: Match;
+  allMatches: Match[];
   saving: boolean;
   onSave: (match: Match, homeTeam: string, awayTeam: string) => void;
 }) {
@@ -428,8 +456,8 @@ function KnockoutTeamRow({
     || away !== (isPlaceholder(match.awayTeam) ? '' : match.awayTeam);
 
   // Beperk de keuze tot de landen die in dit slot terecht kunnen komen.
-  const homeOptions = teamOptionsFor(match.homeTeam);
-  const awayOptions = teamOptionsFor(match.awayTeam);
+  const homeOptions = teamOptionsFor(match.homeTeam, allMatches);
+  const awayOptions = teamOptionsFor(match.awayTeam, allMatches);
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
