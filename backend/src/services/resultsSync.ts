@@ -130,9 +130,9 @@ export async function syncResults(prisma: PrismaClient): Promise<SyncResult> {
 
   let data: any;
   try {
-    // Alleen afgeronde wedstrijden ophalen; we koppelen uitsluitend op exact
-    // teampaar, zodat alleen echte uitslagen van bestaande wedstrijden landen.
-    const res = await fetch(`${API_BASE}/competitions/${COMPETITION}/matches?status=FINISHED`, {
+    // Alle wedstrijden ophalen (ook nog niet afgerond), zodat we ook de datum/tijd
+    // van komende en lopende wedstrijden kunnen synchroniseren met de echte bron.
+    const res = await fetch(`${API_BASE}/competitions/${COMPETITION}/matches`, {
       headers: { 'X-Auth-Token': apiKey },
     });
     if (!res.ok) {
@@ -151,17 +151,44 @@ export async function syncResults(prisma: PrismaClient): Promise<SyncResult> {
   // wedstrijd niet automatisch werd verwerkt (en hem handmatig kan invullen).
   const unmatchedSet = new Set<string>();
   let updated = 0;
+  let datesUpdated = 0;
 
   for (const apiMatch of apiMatches) {
     const homeRaw = apiMatch.homeTeam?.name;
     const awayRaw = apiMatch.awayTeam?.name;
     const home = toDutch(homeRaw);
     const away = toDutch(awayRaw);
-    // Bepaal de eindstand exclusief strafschoppen. De poule scoort op de stand
-    // na de verlenging (bij een strafschoppenreeks altijd gelijk: 0-0, 1-1, ...).
-    // football-data's fullTime bevat bij een shootout de strafschoppen en is
-    // bovendien inconsistent; regularTime (na 90 min) + extraTime (doelpunten in
-    // de verlenging) is de betrouwbare bron.
+
+    // Noteer onherkende landnamen voor diagnose.
+    if (homeRaw && !home) unmatchedSet.add(homeRaw);
+    if (awayRaw && !away) unmatchedSet.add(awayRaw);
+    if (!home || !away) continue;
+
+    // Koppel op teamnaam én fase (groep vs knockout). Zo wordt een teampaar dat
+    // zowel in de groepsfase als de knockout kan voorkomen eenduidig gekoppeld,
+    // en telt een gelijknamige wedstrijd niet dubbel.
+    const apiIsGroup = apiMatch.stage === 'GROUP_STAGE';
+    const target = ourMatches.find(
+      (m) =>
+        ((m.homeTeam === home && m.awayTeam === away) || (m.homeTeam === away && m.awayTeam === home)) &&
+        (m.group != null) === apiIsGroup
+    );
+    if (!target) continue;
+
+    const updateData: { matchDate?: Date; homeScore?: number; awayScore?: number } = {};
+
+    // 1) Datum/tijd synchroniseren met de echte bron.
+    if (apiMatch.utcDate) {
+      const apiDate = new Date(apiMatch.utcDate);
+      if (!isNaN(apiDate.getTime()) && new Date(target.matchDate).getTime() !== apiDate.getTime()) {
+        updateData.matchDate = apiDate;
+        datesUpdated++;
+      }
+    }
+
+    // 2) Eindstand exclusief strafschoppen, als de wedstrijd is afgerond. Bij een
+    // strafschoppenreeks is regularTime (na 90 min) + extraTime (verlenging) de
+    // betrouwbare bron; fullTime bevat dan de strafschoppen en is inconsistent.
     const sc = apiMatch.score || {};
     let homeScore = sc.fullTime?.home;
     let awayScore = sc.fullTime?.away;
@@ -173,52 +200,30 @@ export async function syncResults(prisma: PrismaClient): Promise<SyncResult> {
       awayScore = sc.regularTime.away + (sc.extraTime?.away ?? 0);
     }
 
-    // Noteer onherkende landnamen van afgeronde wedstrijden voor diagnose.
-    if (homeRaw && !home) unmatchedSet.add(homeRaw);
-    if (awayRaw && !away) unmatchedSet.add(awayRaw);
-
-    if (!home || !away || homeScore === null || homeScore === undefined || awayScore === null || awayScore === undefined) {
-      continue;
+    let scoreChanged = false;
+    if (homeScore != null && awayScore != null) {
+      const flipped = target.homeTeam === away && target.awayTeam === home;
+      const newHome = flipped ? awayScore : homeScore;
+      const newAway = flipped ? homeScore : awayScore;
+      if (target.homeScore !== newHome || target.awayScore !== newAway) {
+        updateData.homeScore = newHome;
+        updateData.awayScore = newAway;
+        scoreChanged = true;
+      }
     }
 
-    // Zoek de bijbehorende wedstrijd op basis van de teams.
-    const target = ourMatches.find(
-      (m) => m.homeTeam === home && m.awayTeam === away
-    ) || ourMatches.find(
-      (m) => m.homeTeam === away && m.awayTeam === home
-    );
-    if (!target) continue;
+    if (updateData.matchDate === undefined && !scoreChanged) continue; // niets te doen
 
-    // Datumcontrole: het teampaar moet ook rond dezelfde datum spelen. Zo wordt
-    // een gelijknamige wedstrijd uit een ander toernooi of een oefenwedstrijd
-    // (zelfde landen, andere datum) niet per ongeluk overgenomen.
-    if (apiMatch.utcDate) {
-      const daysApart = Math.abs(
-        new Date(apiMatch.utcDate).getTime() - new Date(target.matchDate).getTime()
-      ) / (1000 * 60 * 60 * 24);
-      if (daysApart > 2) continue;
-    }
+    await prisma.match.update({ where: { id: target.id }, data: updateData });
+    if (!scoreChanged) continue; // alleen datum bijgewerkt
 
-    // Bepaal of teams omgedraaid zijn t.o.v. onze opstelling.
-    const flipped = target.homeTeam === away && target.awayTeam === home;
-    const newHome = flipped ? awayScore : homeScore;
-    const newAway = flipped ? homeScore : awayScore;
-
-    if (target.homeScore === newHome && target.awayScore === newAway) {
-      continue; // al up-to-date
-    }
-
-    await prisma.match.update({
-      where: { id: target.id },
-      data: { homeScore: newHome, awayScore: newAway },
-    });
     await recalcMatchPredictions(prisma, target.id);
     updated++;
     updatedMatches.push({
       matchNum: target.matchNum,
       homeTeam: target.homeTeam,
       awayTeam: target.awayTeam,
-      score: `${newHome}-${newAway}`,
+      score: `${updateData.homeScore}-${updateData.awayScore}`,
     });
   }
 
@@ -228,6 +233,9 @@ export async function syncResults(prisma: PrismaClient): Promise<SyncResult> {
   }
 
   let message = updated > 0 ? `${updated} uitslag(en) bijgewerkt` : 'Geen nieuwe uitslagen';
+  if (datesUpdated > 0) {
+    message += ` — ${datesUpdated} datum/tijd bijgewerkt`;
+  }
   if (unmatched.length > 0) {
     message += ` — ${unmatched.length} onbekende landnaam/-namen: ${unmatched.join(', ')}`;
   }
