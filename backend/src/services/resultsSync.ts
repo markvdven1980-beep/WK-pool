@@ -175,7 +175,7 @@ export async function syncResults(prisma: PrismaClient): Promise<SyncResult> {
     );
     if (!target) continue;
 
-    const updateData: { matchDate?: Date; homeScore?: number; awayScore?: number } = {};
+    const updateData: { matchDate?: Date; homeScore?: number | null; awayScore?: number | null } = {};
 
     // 1) Datum/tijd synchroniseren met de echte bron.
     if (apiMatch.utcDate) {
@@ -186,30 +186,43 @@ export async function syncResults(prisma: PrismaClient): Promise<SyncResult> {
       }
     }
 
-    // 2) Eindstand exclusief strafschoppen, als de wedstrijd is afgerond. Bij een
-    // strafschoppenreeks is regularTime (na 90 min) + extraTime (verlenging) de
-    // betrouwbare bron; fullTime bevat dan de strafschoppen en is inconsistent.
-    const sc = apiMatch.score || {};
-    let homeScore = sc.fullTime?.home;
-    let awayScore = sc.fullTime?.away;
-    const wentToPenalties =
-      sc.duration === 'PENALTY_SHOOTOUT' ||
-      (sc.penalties && sc.penalties.home != null && sc.penalties.away != null);
-    if (wentToPenalties && sc.regularTime?.home != null && sc.regularTime?.away != null) {
-      homeScore = sc.regularTime.home + (sc.extraTime?.home ?? 0);
-      awayScore = sc.regularTime.away + (sc.extraTime?.away ?? 0);
-    }
+    // Alleen een AFGERONDE wedstrijd levert een eindstand. Bij een lopende
+    // wedstrijd bevat de feed de tussenstand — die mag NOOIT als uitslag gelden.
+    const status = apiMatch.status;
+    const isFinished = status === 'FINISHED' || status === 'AWARDED';
+    const isLive = status === 'IN_PLAY' || status === 'PAUSED';
 
     let scoreChanged = false;
-    if (homeScore != null && awayScore != null) {
-      const flipped = target.homeTeam === away && target.awayTeam === home;
-      const newHome = flipped ? awayScore : homeScore;
-      const newAway = flipped ? homeScore : awayScore;
-      if (target.homeScore !== newHome || target.awayScore !== newAway) {
-        updateData.homeScore = newHome;
-        updateData.awayScore = newAway;
-        scoreChanged = true;
+    if (isFinished) {
+      // Eindstand exclusief strafschoppen. Bij een strafschoppenreeks is
+      // regularTime (na 90 min) + extraTime (verlenging) de betrouwbare bron;
+      // fullTime bevat dan de strafschoppen en is inconsistent.
+      const sc = apiMatch.score || {};
+      let homeScore = sc.fullTime?.home;
+      let awayScore = sc.fullTime?.away;
+      const wentToPenalties =
+        sc.duration === 'PENALTY_SHOOTOUT' ||
+        (sc.penalties && sc.penalties.home != null && sc.penalties.away != null);
+      if (wentToPenalties && sc.regularTime?.home != null && sc.regularTime?.away != null) {
+        homeScore = sc.regularTime.home + (sc.extraTime?.home ?? 0);
+        awayScore = sc.regularTime.away + (sc.extraTime?.away ?? 0);
       }
+      if (homeScore != null && awayScore != null) {
+        const flipped = target.homeTeam === away && target.awayTeam === home;
+        const newHome = flipped ? awayScore : homeScore;
+        const newAway = flipped ? homeScore : awayScore;
+        if (target.homeScore !== newHome || target.awayScore !== newAway) {
+          updateData.homeScore = newHome;
+          updateData.awayScore = newAway;
+          scoreChanged = true;
+        }
+      }
+    } else if (isLive && target.homeScore !== null) {
+      // Wedstrijd is nog bezig maar er staat al een (foutieve) eindstand → wissen,
+      // zodat er geen punten worden toegekend op basis van een tussenstand.
+      updateData.homeScore = null;
+      updateData.awayScore = null;
+      scoreChanged = true;
     }
 
     if (updateData.matchDate === undefined && !scoreChanged) continue; // niets te doen
@@ -223,7 +236,7 @@ export async function syncResults(prisma: PrismaClient): Promise<SyncResult> {
       matchNum: target.matchNum,
       homeTeam: target.homeTeam,
       awayTeam: target.awayTeam,
-      score: `${updateData.homeScore}-${updateData.awayScore}`,
+      score: updateData.homeScore === null ? 'gewist (wedstrijd bezig)' : `${updateData.homeScore}-${updateData.awayScore}`,
     });
   }
 
