@@ -425,6 +425,65 @@ adminRouter.get('/bonus', async (req: AuthRequest, res: Response) => {
   });
 });
 
+// Diagnose: overzicht van de wedstrijdvoorspellingen van één gebruiker per poule,
+// inclusief afgeronde wedstrijden die niet zijn ingevuld en de toegekende punten.
+adminRouter.get('/user-predictions', async (req: AuthRequest, res: Response) => {
+  if (!(await requireAdmin(req, res))) return;
+  const username = (req.query.username as string)?.trim();
+  if (!username) { res.status(400).json({ error: 'username is verplicht' }); return; }
+
+  const allUsers = await prisma.user.findMany();
+  const user = allUsers.find((u) => u.username.trim().toLowerCase() === username.toLowerCase());
+  if (!user) { res.status(404).json({ error: 'Gebruiker niet gevonden' }); return; }
+
+  const memberships = await prisma.poolMember.findMany({
+    where: { userId: user.id },
+    include: { pool: { select: { name: true } } },
+  });
+  const finished = await prisma.match.findMany({
+    where: { homeScore: { not: null } },
+    orderBy: { matchNum: 'asc' },
+  });
+  const preds = await prisma.prediction.findMany({
+    where: { userId: user.id },
+    include: { match: true },
+  });
+
+  const perPool = memberships.map((m) => {
+    const poolPreds = preds.filter((p) => p.poolId === m.poolId);
+    const predictedIds = new Set(poolPreds.map((p) => p.matchId));
+    const predictedFinished = poolPreds
+      .filter((p) => p.match.homeScore !== null)
+      .sort((a, b) => a.match.matchNum - b.match.matchNum)
+      .map((p) => ({
+        matchNum: p.match.matchNum,
+        teams: `${p.match.homeTeam} - ${p.match.awayTeam}`,
+        voorspelling: `${p.homeScore}-${p.awayScore}`,
+        uitslag: `${p.match.homeScore}-${p.match.awayScore}`,
+        toto: p.toto,
+        punten: p.pointsEarned,
+      }));
+    const missing = finished
+      .filter((fm) => !predictedIds.has(fm.id))
+      .map((fm) => ({
+        matchNum: fm.matchNum,
+        teams: `${fm.homeTeam} - ${fm.awayTeam}`,
+        uitslag: `${fm.homeScore}-${fm.awayScore}`,
+      }));
+    return {
+      pool: m.pool.name,
+      totaalVoorspellingen: poolPreds.length,
+      afgerondeWedstrijden: finished.length,
+      ingevuldVanAfgerond: predictedFinished.length,
+      nietIngevuld: missing.length,
+      voorspellingenMetUitslag: predictedFinished,
+      nietIngevuldeAfgerondeWedstrijden: missing,
+    };
+  });
+
+  res.json({ user: user.name, username: user.username, perPool });
+});
+
 // Overzicht van alle antwoorden op één bonusvraag, met per deelnemer of het
 // (met de huidige matchlogica) goed gerekend wordt. Handig om vooraf te zien
 // wie punten krijgt. Geef ?answer=... mee om tegen een specifiek antwoord te
