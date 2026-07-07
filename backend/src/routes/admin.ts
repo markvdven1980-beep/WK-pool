@@ -425,6 +425,37 @@ adminRouter.get('/bonus', async (req: AuthRequest, res: Response) => {
   });
 });
 
+// Diagnose: wie mist een voorspelling voor de opgegeven wedstrijden (?matchNums=69,70).
+// Puur lezend; verandert niets aan voorspellingen of punten.
+adminRouter.get('/missing-predictions', async (req: AuthRequest, res: Response) => {
+  if (!(await requireAdmin(req, res))) return;
+  const nums = String(req.query.matchNums ?? '')
+    .split(',')
+    .map((n) => parseInt(n.trim(), 10))
+    .filter((n) => !isNaN(n));
+  if (nums.length === 0) { res.status(400).json({ error: 'matchNums is verplicht' }); return; }
+
+  const matches = await prisma.match.findMany({ where: { matchNum: { in: nums } } });
+  const memberships = await prisma.poolMember.findMany({
+    include: { user: { select: { name: true } }, pool: { select: { name: true } } },
+  });
+
+  const result = [];
+  for (const m of matches.sort((a, b) => a.matchNum - b.matchNum)) {
+    const preds = await prisma.prediction.findMany({
+      where: { matchId: m.id },
+      select: { userId: true, poolId: true },
+    });
+    const has = new Set(preds.map((p) => `${p.userId}:${p.poolId}`));
+    const missing = memberships
+      .filter((mem) => !has.has(`${mem.userId}:${mem.poolId}`))
+      .map((mem) => `${mem.user.name} (${mem.pool.name})`)
+      .sort();
+    result.push({ matchNum: m.matchNum, teams: `${m.homeTeam} - ${m.awayTeam}`, missingCount: missing.length, missing });
+  }
+  res.json(result);
+});
+
 // Diagnose: dekking per afgeronde wedstrijd — hoeveel voorspellingen er zijn t.o.v.
 // het aantal lidmaatschappen. Een wedstrijd die door veel deelnemers gemist is,
 // wijst op een technisch/deadline-probleem i.p.v. individueel vergeten.
