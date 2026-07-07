@@ -425,6 +425,32 @@ adminRouter.get('/bonus', async (req: AuthRequest, res: Response) => {
   });
 });
 
+// Diagnose: dekking per afgeronde wedstrijd — hoeveel voorspellingen er zijn t.o.v.
+// het aantal lidmaatschappen. Een wedstrijd die door veel deelnemers gemist is,
+// wijst op een technisch/deadline-probleem i.p.v. individueel vergeten.
+adminRouter.get('/prediction-coverage', async (req: AuthRequest, res: Response) => {
+  if (!(await requireAdmin(req, res))) return;
+
+  const finished = await prisma.match.findMany({
+    where: { homeScore: { not: null } },
+    orderBy: { matchNum: 'asc' },
+  });
+  const totalMemberships = await prisma.poolMember.count();
+  const preds = await prisma.prediction.findMany({ select: { matchId: true } });
+  const countByMatch = new Map<string, number>();
+  for (const p of preds) countByMatch.set(p.matchId, (countByMatch.get(p.matchId) ?? 0) + 1);
+
+  const matches = finished.map((m) => ({
+    matchNum: m.matchNum,
+    teams: `${m.homeTeam} - ${m.awayTeam}`,
+    round: m.round,
+    voorspellingen: countByMatch.get(m.id) ?? 0,
+    ontbreekt: totalMemberships - (countByMatch.get(m.id) ?? 0),
+  }));
+
+  res.json({ totalMemberships, matches });
+});
+
 // Diagnose: overzicht van de wedstrijdvoorspellingen van één gebruiker per poule,
 // inclusief afgeronde wedstrijden die niet zijn ingevuld en de toegekende punten.
 adminRouter.get('/user-predictions', async (req: AuthRequest, res: Response) => {
